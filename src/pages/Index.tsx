@@ -1,12 +1,51 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import Header from "@/components/Header";
+import MetricsGrid from "@/components/MetricsGrid";
+import LogStream from "@/components/LogStream";
+import AnalyticsChart from "@/components/AnalyticsChart";
+import SqlQuery from "@/components/SqlQuery";
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Header />
+      
+      <main className="container mx-auto px-6 py-8 space-y-8">
+        {/* Metrics Overview */}
+        <section>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-foreground">Platform Overview</h2>
+            <p className="text-muted-foreground">Real-time metrics from your Lakehouse architecture</p>
+          </div>
+          <MetricsGrid />
+        </section>
+
+        {/* Analytics Charts */}
+        <section>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-foreground">Analytics Dashboard</h2>
+            <p className="text-muted-foreground">Spark Structured Streaming insights</p>
+          </div>
+          <AnalyticsChart />
+        </section>
+
+        {/* Live Data Stream */}
+        <section>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-foreground">Live Data Pipeline</h2>
+            <p className="text-muted-foreground">Real-time log ingestion and processing</p>
+          </div>
+          <LogStream />
+        </section>
+
+        {/* SQL Query Interface */}
+        <section>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-foreground">Interactive Analytics</h2>
+            <p className="text-muted-foreground">Query your Delta Lake with Spark SQL</p>
+          </div>
+          <SqlQuery />
+        </section>
+      </main>
     </div>
   );
 };
