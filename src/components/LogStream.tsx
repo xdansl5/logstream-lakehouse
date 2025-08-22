@@ -1,67 +1,14 @@
-import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface LogEntry {
-  id: string;
-  timestamp: string;
-  level: "INFO" | "WARN" | "ERROR" | "DEBUG";
-  source: string;
-  message: string;
-  ip?: string;
-  status?: number;
-  responseTime?: number;
-}
+import { useData } from "@/contexts/DataContext";
 
 const LogStream = () => {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [isStreaming, setIsStreaming] = useState(true);
+  const { logs, isStreaming, setIsStreaming, clearLogs, getAnomalies } = useData();
 
-  // Mock log generator
-  const generateLog = (): LogEntry => {
-    const levels: LogEntry["level"][] = ["INFO", "WARN", "ERROR", "DEBUG"];
-    const sources = ["web-server", "api-gateway", "database", "auth-service", "kafka-consumer"];
-    const messages = [
-      "Request processed successfully",
-      "Database connection timeout",
-      "User authentication failed",
-      "Cache miss for key: user_session_",
-      "Spark job completed",
-      "Delta table compaction started",
-      "Anomaly detected in request pattern",
-      "Streaming pipeline healthy"
-    ];
-
-    const level = levels[Math.floor(Math.random() * levels.length)];
-    const isError = level === "ERROR";
-    
-    return {
-      id: Math.random().toString(36).substr(2, 9),
-      timestamp: new Date().toISOString(),
-      level,
-      source: sources[Math.floor(Math.random() * sources.length)],
-      message: messages[Math.floor(Math.random() * messages.length)],
-      ip: `192.168.1.${Math.floor(Math.random() * 255)}`,
-      status: isError ? 500 : Math.random() > 0.8 ? 404 : 200,
-      responseTime: Math.floor(Math.random() * 500) + 50
-    };
-  };
-
-  useEffect(() => {
-    if (!isStreaming) return;
-
-    const interval = setInterval(() => {
-      const newLog = generateLog();
-      setLogs(prev => [newLog, ...prev.slice(0, 99)]); // Keep only last 100 logs
-    }, Math.random() * 2000 + 500); // Random interval between 500ms-2.5s
-
-    return () => clearInterval(interval);
-  }, [isStreaming]);
-
-  const getLevelColor = (level: LogEntry["level"]) => {
+  const getLevelColor = (level: string) => {
     switch (level) {
       case "ERROR": return "destructive";
       case "WARN": return "outline";
@@ -81,17 +28,30 @@ const LogStream = () => {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-lg font-semibold">Live Log Stream</CardTitle>
-            <p className="text-sm text-muted-foreground">Real-time log ingestion from Kafka</p>
+            <p className="text-sm text-muted-foreground">
+              Real-time log ingestion from Kafka • {logs.length} events • {getAnomalies().length} anomalies
+            </p>
           </div>
-          <Button
-            variant={isStreaming ? "default" : "outline"}
-            size="sm"
-            onClick={() => setIsStreaming(!isStreaming)}
-            className="flex items-center space-x-2"
-          >
-            {isStreaming ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            <span>{isStreaming ? "Pause" : "Resume"}</span>
-          </Button>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearLogs}
+              className="flex items-center space-x-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Clear</span>
+            </Button>
+            <Button
+              variant={isStreaming ? "default" : "outline"}
+              size="sm"
+              onClick={() => setIsStreaming(!isStreaming)}
+              className="flex items-center space-x-2"
+            >
+              {isStreaming ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              <span>{isStreaming ? "Pause" : "Resume"}</span>
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -116,6 +76,12 @@ const LogStream = () => {
                         <span className="font-mono">{log.ip}</span>
                       </>
                     )}
+                    {log.endpoint && (
+                      <>
+                        <span>•</span>
+                        <span className="font-mono text-primary">{log.endpoint}</span>
+                      </>
+                    )}
                     {log.status && (
                       <>
                         <span>•</span>
@@ -127,13 +93,20 @@ const LogStream = () => {
                     {log.responseTime && (
                       <>
                         <span>•</span>
-                        <span className="font-mono">{log.responseTime}ms</span>
+                        <span className={`font-mono ${log.responseTime > 1000 ? 'text-destructive' : 'text-foreground'}`}>
+                          {log.responseTime}ms
+                        </span>
                       </>
                     )}
                   </div>
-                  <p className="text-sm text-foreground font-mono break-all">
-                    {log.message}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-foreground font-mono break-all flex-1">
+                      {log.message}
+                    </p>
+                    {(log.level === "ERROR" || (log.responseTime && log.responseTime > 1000)) && (
+                      <AlertTriangle className="h-4 w-4 text-destructive ml-2 flex-shrink-0" />
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

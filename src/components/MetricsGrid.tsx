@@ -1,81 +1,9 @@
-import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Users } from "lucide-react";
-
-interface Metric {
-  title: string;
-  value: string;
-  change: string;
-  trend: "up" | "down";
-  icon: React.ReactNode;
-  status: "success" | "warning" | "error" | "info";
-}
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { useData } from "@/contexts/DataContext";
 
 const MetricsGrid = () => {
-  const [metrics, setMetrics] = useState<Metric[]>([
-    {
-      title: "Events/sec",
-      value: "2,847",
-      change: "+12.5%",
-      trend: "up",
-      icon: <TrendingUp className="h-4 w-4" />,
-      status: "success"
-    },
-    {
-      title: "Error Rate",
-      value: "0.34%",
-      change: "-23.1%",
-      trend: "down",
-      icon: <AlertTriangle className="h-4 w-4" />,
-      status: "success"
-    },
-    {
-      title: "Avg Response Time",
-      value: "145ms",
-      change: "+5.2%",
-      trend: "up",
-      icon: <Clock className="h-4 w-4" />,
-      status: "warning"
-    },
-    {
-      title: "Active Sessions",
-      value: "18,429",
-      change: "+8.7%",
-      trend: "up",
-      icon: <Users className="h-4 w-4" />,
-      status: "info"
-    },
-    {
-      title: "Data Processed",
-      value: "847 GB",
-      change: "+15.3%",
-      trend: "up",
-      icon: <CheckCircle className="h-4 w-4" />,
-      status: "success"
-    },
-    {
-      title: "Delta Tables",
-      value: "23",
-      change: "0%",
-      trend: "up",
-      icon: <TrendingUp className="h-4 w-4" />,
-      status: "info"
-    }
-  ]);
-
-  // Simulate real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setMetrics(prev => prev.map(metric => ({
-        ...metric,
-        value: metric.title === "Events/sec" 
-          ? (Math.floor(Math.random() * 1000) + 2000).toLocaleString()
-          : metric.value
-      })));
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
+  const { metrics } = useData();
 
   const getStatusColor = (status: string) => {
     switch (status) {

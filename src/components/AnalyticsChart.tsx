@@ -1,59 +1,9 @@
-import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
-
-interface ChartData {
-  time: string;
-  requests: number;
-  errors: number;
-  responseTime: number;
-}
+import { useData } from "@/contexts/DataContext";
 
 const AnalyticsChart = () => {
-  const [data, setData] = useState<ChartData[]>([]);
-
-  // Generate initial data
-  useEffect(() => {
-    const initialData: ChartData[] = [];
-    for (let i = 23; i >= 0; i--) {
-      const time = new Date();
-      time.setMinutes(time.getMinutes() - i);
-      
-      initialData.push({
-        time: time.toLocaleTimeString('en-US', { 
-          hour12: false, 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        }),
-        requests: Math.floor(Math.random() * 1000) + 2000,
-        errors: Math.floor(Math.random() * 50) + 10,
-        responseTime: Math.floor(Math.random() * 100) + 100
-      });
-    }
-    setData(initialData);
-  }, []);
-
-  // Update data in real-time
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setData(prev => {
-        const newEntry: ChartData = {
-          time: new Date().toLocaleTimeString('en-US', { 
-            hour12: false, 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          }),
-          requests: Math.floor(Math.random() * 1000) + 2000,
-          errors: Math.floor(Math.random() * 50) + 10,
-          responseTime: Math.floor(Math.random() * 100) + 100
-        };
-        
-        return [...prev.slice(1), newEntry];
-      });
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
+  const { chartData } = useData();
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -64,7 +14,7 @@ const AnalyticsChart = () => {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={data}>
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="requestGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
@@ -108,7 +58,7 @@ const AnalyticsChart = () => {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={data}>
+            <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis 
                 dataKey="time" 
