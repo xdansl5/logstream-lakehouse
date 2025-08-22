@@ -205,17 +205,25 @@ df = spark.read.format("delta").option("versionAsOf", 0).load("/path/to/table")
 df = spark.read.format("delta").option("timestampAsOf", "2024-01-01").load("/path/to/table")
 ```
 
-## 🎮 Workflow Tipico
+## Quick Start
 
-1. **Setup iniziale:**
-   ```bash
-   ./setup_environment.sh
-   ```
+### Opzione 1: Demo Rapida (Solo Web Interface)
+```bash
+# Avvia solo l'interfaccia web connessa ai backend
+cd scripts
+python start_lakehouse.py --mode quick
+```
 
-2. **Avvia pipeline completa:**
-   ```bash
-   python3 demo_pipeline.py
-   ```
+### Opzione 2: Demo Completa (Kafka + Spark + Delta Lake)
+```bash
+# Avvia tutta la pipeline Lakehouse
+cd scripts
+python start_lakehouse.py --mode full
+```
+
+### Setup Manuale
+
+Per avviare i componenti manualmente:
 
 3. **In parallelo, monitora:**
    - Kafka UI: http://localhost:8080

@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useWebSocket, WebSocketMessage } from '@/hooks/useWebSocket';
+import { apiService, LogEntry as ApiLogEntry, QueryResult as ApiQueryResult } from '@/services/api';
 
 export interface LogEntry {
   id: string;
@@ -42,7 +44,11 @@ interface DataContextType {
   setIsStreaming: (streaming: boolean) => void;
   executeQuery: (query: string) => Promise<{ results: QueryResult[]; executionTime: string }>;
   clearLogs: () => void;
-  getAnomalies: () => LogEntry[];
+  getAnomalies: () => Promise<LogEntry[]>;
+  // Backend connection state
+  isBackendConnected: boolean;
+  useRealData: boolean;
+  setUseRealData: (useReal: boolean) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -59,12 +65,48 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [isStreaming, setIsStreaming] = useState(true);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
+  const [useRealData, setUseRealData] = useState(true);
   const [currentMetrics, setCurrentMetrics] = useState({
     eventsPerSec: 0,
     errorRate: 0,
     avgResponseTime: 0,
     activeSessions: 0,
     dataProcessed: 0
+  });
+
+  // WebSocket connection for real-time updates
+  const { isConnected: wsConnected, lastMessage } = useWebSocket({
+    onMessage: (message: WebSocketMessage) => {
+      if (message.type === 'log_update') {
+        const apiLog = message.data as ApiLogEntry;
+        const logEntry: LogEntry = {
+          id: apiLog.id,
+          timestamp: apiLog.timestamp,
+          level: apiLog.level,
+          source: apiLog.source,
+          message: apiLog.message,
+          ip: apiLog.ip,
+          status: apiLog.status,
+          responseTime: apiLog.responseTime,
+          endpoint: apiLog.endpoint,
+          userId: apiLog.userId,
+          sessionId: apiLog.sessionId
+        };
+        
+        setLogs(prev => [logEntry, ...prev.slice(0, 999)]);
+      } else if (message.type === 'metrics_update') {
+        setCurrentMetrics(message.data);
+      }
+    },
+    onConnect: () => {
+      console.log('🔌 Connected to Lakehouse WebSocket');
+      setIsBackendConnected(true);
+    },
+    onDisconnect: () => {
+      console.log('🔌 Disconnected from Lakehouse WebSocket');
+      setIsBackendConnected(false);
+    }
   });
 
   // Simulate realistic log patterns based on Python scripts
@@ -145,9 +187,50 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setChartData(initialData);
   }, []);
 
-  // Stream logs
+  // Load initial data from backend if available
   useEffect(() => {
-    if (!isStreaming) return;
+    const loadInitialData = async () => {
+      if (useRealData) {
+        try {
+          const connected = await apiService.testConnection();
+          setIsBackendConnected(connected);
+          
+          if (connected) {
+            console.log('✅ Backend connected, loading real data...');
+            const { logs: realLogs } = await apiService.getLogs();
+            const { metrics: realMetrics } = await apiService.getMetrics();
+            
+            // Convert API logs to internal format
+            const convertedLogs = realLogs.map(apiLog => ({
+              id: apiLog.id,
+              timestamp: apiLog.timestamp,
+              level: apiLog.level,
+              source: apiLog.source,
+              message: apiLog.message,
+              ip: apiLog.ip,
+              status: apiLog.status,
+              responseTime: apiLog.responseTime,
+              endpoint: apiLog.endpoint,
+              userId: apiLog.userId,
+              sessionId: apiLog.sessionId
+            }));
+            
+            setLogs(convertedLogs);
+            setCurrentMetrics(realMetrics);
+          }
+        } catch (error) {
+          console.warn('⚠️ Could not load real data, using simulation:', error);
+          setIsBackendConnected(false);
+        }
+      }
+    };
+
+    loadInitialData();
+  }, [useRealData]);
+
+  // Fallback: Stream simulated logs if backend not available
+  useEffect(() => {
+    if (!isStreaming || (useRealData && isBackendConnected)) return;
 
     const interval = setInterval(() => {
       const newLog = generateRealisticLog();
@@ -155,9 +238,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, Math.random() * 1500 + 500); // Between 500ms-2s
 
     return () => clearInterval(interval);
-  }, [isStreaming, generateRealisticLog]);
+  }, [isStreaming, generateRealisticLog, useRealData, isBackendConnected]);
 
-  // Update chart data in real-time
+  // Update chart data in real-time (simulation for now)
   useEffect(() => {
     if (!isStreaming) return;
 
@@ -181,9 +264,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => clearInterval(interval);
   }, [isStreaming]);
 
-  // Calculate real-time metrics based on current logs
+  // Calculate real-time metrics based on current logs (only if not using real backend data)
   useEffect(() => {
-    if (logs.length === 0) return;
+    if (logs.length === 0 || (useRealData && isBackendConnected)) return;
 
     const recentLogs = logs.slice(0, 100); // Last 100 logs for metrics
     const errors = recentLogs.filter(log => log.level === "ERROR");
@@ -198,11 +281,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       activeSessions: uniqueSessions * 100, // Scale up for demo
       dataProcessed: Math.random() * 100 + 800 // GB processed
     });
-  }, [logs]);
+  }, [logs, useRealData, isBackendConnected]);
 
-  // Simulate Spark SQL query execution
+  // Execute query on real Delta Lake data or simulate
   const executeQuery = useCallback(async (query: string): Promise<{ results: QueryResult[]; executionTime: string }> => {
-    // Simulate query processing time
+    if (useRealData && isBackendConnected) {
+      try {
+        console.log('🔍 Executing real Spark SQL query:', query);
+        const result = await apiService.executeQuery(query);
+        return {
+          results: result.results as QueryResult[],
+          executionTime: result.executionTime
+        };
+      } catch (error) {
+        console.error('❌ Query execution failed, falling back to simulation:', error);
+      }
+    }
+
+    // Fallback to simulation
     await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 1000));
     
     const executionTime = `${(Math.random() * 2 + 0.5).toFixed(2)}s`;
@@ -243,20 +339,42 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     return { results, executionTime };
-  }, []);
+  }, [useRealData, isBackendConnected]);
 
   const clearLogs = useCallback(() => {
     setLogs([]);
   }, []);
 
-  const getAnomalies = useCallback(() => {
+  const getAnomalies = useCallback(async () => {
+    if (useRealData && isBackendConnected) {
+      try {
+        const { anomalies } = await apiService.getAnomalies();
+        return anomalies.map(apiLog => ({
+          id: apiLog.id,
+          timestamp: apiLog.timestamp,
+          level: apiLog.level,
+          source: apiLog.source,
+          message: apiLog.message,
+          ip: apiLog.ip,
+          status: apiLog.status,
+          responseTime: apiLog.responseTime,
+          endpoint: apiLog.endpoint,
+          userId: apiLog.userId,
+          sessionId: apiLog.sessionId
+        }));
+      } catch (error) {
+        console.error('❌ Failed to fetch anomalies:', error);
+      }
+    }
+
+    // Fallback to local filtering
     return logs.filter(log => 
       log.level === "ERROR" || 
       (log.responseTime && log.responseTime > 1000) ||
       log.message.includes("anomaly") ||
       log.message.includes("timeout")
     ).slice(0, 50);
-  }, [logs]);
+  }, [logs, useRealData, isBackendConnected]);
 
   // Generate metrics based on current data
   const metrics: Metric[] = [
@@ -319,7 +437,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsStreaming,
       executeQuery,
       clearLogs,
-      getAnomalies
+      getAnomalies,
+      // Additional state for backend connection
+      isBackendConnected: isBackendConnected && wsConnected,
+      useRealData,
+      setUseRealData
     }}>
       {children}
     </DataContext.Provider>
