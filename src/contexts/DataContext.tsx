@@ -47,6 +47,34 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+// Helper to read env and decide data mode
+const getDataMode = (): 'real' | 'mock' => {
+	const mode = import.meta.env.VITE_DATA_MODE as string | undefined;
+	return mode === 'real' ? 'real' : 'mock';
+};
+
+const getApiBaseUrl = (): string | undefined => {
+	const base = import.meta.env.VITE_API_BASE_URL as string | undefined;
+	return base && base.trim().length > 0 ? base : undefined;
+};
+
+// Thin wrapper around fetch with JSON and error handling
+async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
+	const response = await fetch(url, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify(body),
+		signal
+	});
+	if (!response.ok) {
+		const text = await response.text().catch(() => '');
+		throw new Error(`Request failed ${response.status}: ${text || response.statusText}`);
+	}
+	return response.json() as Promise<T>;
+}
+
 export const useData = () => {
   const context = useContext(DataContext);
   if (!context) {
@@ -200,50 +228,64 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, [logs]);
 
-  // Simulate Spark SQL query execution
+  // Simulate Spark SQL query execution OR call real backend
   const executeQuery = useCallback(async (query: string): Promise<{ results: QueryResult[]; executionTime: string }> => {
-    // Simulate query processing time
-    await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 1000));
-    
-    const executionTime = `${(Math.random() * 2 + 0.5).toFixed(2)}s`;
-    
-    // Generate realistic results based on query content
-    let results: QueryResult[] = [];
-    
-    if (query.toLowerCase().includes('error') || query.toLowerCase().includes('status_code >= 400')) {
-      // Error analysis query
-      results = [
-        { endpoint: "/api/users", error_count: 15, avg_response_time: 2140 },
-        { endpoint: "/api/orders", error_count: 8, avg_response_time: 1890 },
-        { endpoint: "/api/products", error_count: 12, avg_response_time: 2340 },
-        { endpoint: "/health", error_count: 2, avg_response_time: 890 },
-        { endpoint: "/metrics", error_count: 5, avg_response_time: 1120 }
-      ];
-    } else if (query.toLowerCase().includes('user') || query.toLowerCase().includes('session')) {
-      // User session analysis
-      results = Array.from({ length: 10 }, (_, i) => ({
-        user_id: `user_${i + 1}`,
-        sessions: Math.floor(Math.random() * 5) + 1,
-        page_views: Math.floor(Math.random() * 50) + 10,
-        total_time: Math.floor(Math.random() * 3600) + 300
-      }));
-    } else {
-      // Default hourly metrics
-      results = Array.from({ length: 10 }, (_, i) => {
-        const hour = new Date();
-        hour.setHours(hour.getHours() - i);
-        
-        return {
-          hour: hour.toISOString().substring(0, 16).replace('T', ' '),
-          total_requests: Math.floor(Math.random() * 1000) + 2000,
-          errors: Math.floor(Math.random() * 50) + 5,
-          avg_response_time: Math.floor(Math.random() * 200) + 100
-        };
-      });
-    }
-    
-    return { results, executionTime };
-  }, []);
+		const dataMode = getDataMode();
+		const apiBaseUrl = getApiBaseUrl();
+
+		// Try real backend if configured
+		if (dataMode === 'real' && apiBaseUrl) {
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), 60_000);
+			try {
+				const started = performance.now();
+				// Expect backend endpoint to accept { query } and return { results: QueryResult[] }
+				const response = await postJson<{ results: QueryResult[] }>(`${apiBaseUrl}/query/execute`, { query }, controller.signal);
+				const elapsedMs = performance.now() - started;
+				const executionTime = `${(elapsedMs / 1000).toFixed(2)}s`;
+				return { results: response.results ?? [], executionTime };
+			} catch (error) {
+				// Fallback to simulator on any error
+				console.warn('[executeQuery] Real backend failed, falling back to mock:', error);
+			} finally {
+				clearTimeout(timeout);
+			}
+		}
+
+		// --- Mock simulator (existing behavior) ---
+		await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 1000));
+		const executionTime = `${(Math.random() * 2 + 0.5).toFixed(2)}s`;
+
+		let results: QueryResult[] = [];
+		if (query.toLowerCase().includes('error') || query.toLowerCase().includes('status_code >= 400')) {
+			results = [
+				{ endpoint: "/api/users", error_count: 15, avg_response_time: 2140 },
+				{ endpoint: "/api/orders", error_count: 8, avg_response_time: 1890 },
+				{ endpoint: "/api/products", error_count: 12, avg_response_time: 2340 },
+				{ endpoint: "/health", error_count: 2, avg_response_time: 890 },
+				{ endpoint: "/metrics", error_count: 5, avg_response_time: 1120 }
+			];
+		} else if (query.toLowerCase().includes('user') || query.toLowerCase().includes('session')) {
+			results = Array.from({ length: 10 }, (_, i) => ({
+				user_id: `user_${i + 1}`,
+				sessions: Math.floor(Math.random() * 5) + 1,
+				page_views: Math.floor(Math.random() * 50) + 10,
+				total_time: Math.floor(Math.random() * 3600) + 300
+			}));
+		} else {
+			results = Array.from({ length: 10 }, (_, i) => {
+				const hour = new Date();
+				hour.setHours(hour.getHours() - i);
+				return {
+					hour: hour.toISOString().substring(0, 16).replace('T', ' '),
+					total_requests: Math.floor(Math.random() * 1000) + 2000,
+					errors: Math.floor(Math.random() * 50) + 5,
+					avg_response_time: Math.floor(Math.random() * 200) + 100
+				};
+			});
+		}
+		return { results, executionTime };
+	}, []);
 
   const clearLogs = useCallback(() => {
     setLogs([]);
