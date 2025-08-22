@@ -1,6 +1,8 @@
 import { Activity, Database, Zap } from "lucide-react";
+import { useData } from "@/contexts/DataContext";
 
 const Header = () => {
+  const { sseConnected } = useData();
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
       <div className="container mx-auto px-6 py-4">
@@ -22,9 +24,9 @@ const Header = () => {
           
           <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-2 text-sm">
-              <Activity className="h-4 w-4 text-success" />
+              <Activity className={"h-4 w-4 " + (sseConnected ? "text-success" : "text-destructive")} />
               <span className="text-muted-foreground">Streaming</span>
-              <div className="h-2 w-2 bg-success rounded-full animate-pulse" />
+              <div className={"h-2 w-2 rounded-full " + (sseConnected ? "bg-success animate-pulse" : "bg-destructive")} />
             </div>
             
             <div className="flex items-center space-x-2 text-sm">

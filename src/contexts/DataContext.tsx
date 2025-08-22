@@ -43,6 +43,7 @@ interface DataContextType {
   executeQuery: (query: string) => Promise<{ results: QueryResult[]; executionTime: string }>;
   clearLogs: () => void;
   getAnomalies: () => LogEntry[];
+  sseConnected: boolean;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -66,6 +67,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     activeSessions: 0,
     dataProcessed: 0
   });
+  const [sseConnected, setSseConnected] = useState(false);
 
   // Simulate realistic log patterns based on Python scripts
   const generateRealisticLog = useCallback((): LogEntry => {
@@ -145,9 +147,53 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setChartData(initialData);
   }, []);
 
-  // Stream logs
+  // Connect to SSE stream when streaming is enabled
   useEffect(() => {
     if (!isStreaming) return;
+
+    const sseUrl = (import.meta as any).env?.VITE_SSE_URL ?? 'http://localhost:4000/events';
+    let es: EventSource | null = null;
+
+    try {
+      es = new EventSource(sseUrl, { withCredentials: false });
+    } catch (err) {
+      setSseConnected(false);
+      return;
+    }
+
+    es.onopen = () => {
+      setSseConnected(true);
+    };
+
+    es.onmessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data && data.type === 'hello') return;
+        setLogs(prev => [data as LogEntry, ...prev.slice(0, 999)]);
+      } catch (e) {
+        // ignore malformed messages
+      }
+    };
+
+    es.onerror = () => {
+      setSseConnected(false);
+      if (es) {
+        try { es.close(); } catch {}
+      }
+    };
+
+    return () => {
+      setSseConnected(false);
+      if (es) {
+        try { es.close(); } catch {}
+      }
+    };
+  }, [isStreaming]);
+
+  // Stream logs via simulator only when SSE is not connected
+  useEffect(() => {
+    if (!isStreaming) return;
+    if (sseConnected) return;
 
     const interval = setInterval(() => {
       const newLog = generateRealisticLog();
@@ -155,7 +201,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, Math.random() * 1500 + 500); // Between 500ms-2s
 
     return () => clearInterval(interval);
-  }, [isStreaming, generateRealisticLog]);
+  }, [isStreaming, generateRealisticLog, sseConnected]);
 
   // Update chart data in real-time
   useEffect(() => {
@@ -319,7 +365,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsStreaming,
       executeQuery,
       clearLogs,
-      getAnomalies
+      getAnomalies,
+      sseConnected
     }}>
       {children}
     </DataContext.Provider>
