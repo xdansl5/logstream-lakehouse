@@ -1,4 +1,3 @@
-import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -8,15 +7,6 @@ import { useData } from "@/contexts/DataContext";
 
 const LogStream = () => {
   const { logs, isStreaming, setIsStreaming, clearLogs, getAnomalies } = useData();
-  const [anomaliesCount, setAnomaliesCount] = React.useState(0);
-
-  React.useEffect(() => {
-    const updateAnomalies = async () => {
-      const anomalies = await getAnomalies();
-      setAnomaliesCount(anomalies.length);
-    };
-    updateAnomalies();
-  }, [logs, getAnomalies]);
 
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -39,7 +29,7 @@ const LogStream = () => {
           <div>
             <CardTitle className="text-lg font-semibold">Live Log Stream</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Real-time log ingestion from Kafka • {logs.length} events • {anomaliesCount} anomalies
+              Real-time log ingestion from Kafka • {logs.length} events • {getAnomalies().length} anomalies
             </p>
           </div>
           <div className="flex space-x-2">

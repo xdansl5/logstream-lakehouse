@@ -1,6 +1,4 @@
 import { Activity, Database, Zap } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import ConnectionStatus from "./ConnectionStatus";
 
 const Header = () => {
   return (
@@ -23,21 +21,16 @@ const Header = () => {
           </div>
           
           <div className="flex items-center space-x-6">
-            <ConnectionStatus />
+            <div className="flex items-center space-x-2 text-sm">
+              <Activity className="h-4 w-4 text-success" />
+              <span className="text-muted-foreground">Streaming</span>
+              <div className="h-2 w-2 bg-success rounded-full animate-pulse" />
+            </div>
             
-            <div className="flex items-center gap-2">
-              <Badge variant="default" className="bg-success/20 text-success border-success/50">
-                <Activity className="w-3 h-3 mr-1" />
-                Real-time
-              </Badge>
-              <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/50">
-                <Database className="w-3 h-3 mr-1" />
-                Delta Lake
-              </Badge>
-              <Badge variant="secondary" className="bg-accent/20 text-accent border-accent/50">
-                <Zap className="w-3 h-3 mr-1" />
-                Spark Streaming
-              </Badge>
+            <div className="flex items-center space-x-2 text-sm">
+              <Zap className="h-4 w-4 text-warning" />
+              <span className="text-muted-foreground">Delta Lake</span>
+              <span className="text-warning font-medium">Active</span>
             </div>
           </div>
         </div>
