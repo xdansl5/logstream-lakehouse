@@ -3,13 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Play, Database, Clock, Zap } from "lucide-react";
+import { Play, Database, Clock, Zap, Wifi, WifiOff, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useData } from "@/contexts/DataContext";
 import { useToast } from "@/hooks/use-toast";
 
 const SqlQuery = () => {
-  const { executeQuery } = useData();
+  const { executeQuery, sseConnected, loading } = useData();
   const { toast } = useToast();
   
   const [query, setQuery] = useState(
@@ -39,6 +39,15 @@ LIMIT 10`
       return;
     }
     
+    if (!sseConnected) {
+      toast({
+        title: "Pipeline Not Connected",
+        description: "Please ensure the data pipeline is running and connected.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsRunning(true);
     setExecutionTime(null);
     
@@ -52,15 +61,28 @@ LIMIT 10`
         description: `Found ${queryResults.length} rows in ${time}`,
       });
     } catch (error) {
+      console.error('Query execution error:', error);
       toast({
         title: "Query Failed",
-        description: "An error occurred while executing the query.",
+        description: error instanceof Error ? error.message : "An error occurred while executing the query.",
         variant: "destructive",
       });
     } finally {
       setIsRunning(false);
     }
   };
+
+  const getConnectionStatus = () => {
+    if (loading) {
+      return { icon: <Loader2 className="h-4 w-4 animate-spin" />, text: "Connecting...", color: "text-muted-foreground" };
+    }
+    if (sseConnected) {
+      return { icon: <Wifi className="h-4 w-4" />, text: "Pipeline Connected", color: "text-green-500" };
+    }
+    return { icon: <WifiOff className="h-4 w-4" />, text: "Pipeline Disconnected", color: "text-red-500" };
+  };
+
+  const connectionStatus = getConnectionStatus();
 
   const sampleQueries = [
     {
@@ -109,15 +131,21 @@ ORDER BY anomaly_count DESC`
               <Database className="h-5 w-5 text-primary" />
               <span>Spark SQL Query Interface</span>
             </CardTitle>
-            <p className="text-sm text-muted-foreground">Interactive analytics on Delta Lake</p>
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <span>Interactive analytics on Delta Lake</span>
+              <span className={`flex items-center space-x-1 ${connectionStatus.color}`}>
+                {connectionStatus.icon}
+                <span>{connectionStatus.text}</span>
+              </span>
+            </div>
           </div>
           <div className="flex space-x-2">
-            <Badge variant="outline" className="bg-success/10 text-success border-success/20">
+            <Badge variant="outline" className={`${sseConnected ? 'bg-success/10 text-success border-success/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
               <Zap className="h-3 w-3 mr-1" />
-              Spark SQL Ready
+              {sseConnected ? 'Spark SQL Ready' : 'Pipeline Offline'}
             </Badge>
-            <Badge variant="outline" className="bg-gradient-primary text-primary-foreground border-primary/20">
-              Delta Lake Connected
+            <Badge variant="outline" className={`${sseConnected ? 'bg-gradient-primary text-primary-foreground border-primary/20' : 'bg-muted text-muted-foreground border-muted'}`}>
+              {sseConnected ? 'Delta Lake Connected' : 'Delta Lake Offline'}
             </Badge>
           </div>
         </div>
@@ -132,6 +160,7 @@ ORDER BY anomaly_count DESC`
                 size="sm"
                 onClick={() => setQuery(sample.query)}
                 className="text-xs"
+                disabled={!sseConnected}
               >
                 {sample.name}
               </Button>
@@ -143,16 +172,17 @@ ORDER BY anomaly_count DESC`
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Enter your Spark SQL query..."
             className="min-h-[120px] font-mono text-sm bg-muted/30 border-border/50"
+            disabled={!sseConnected}
           />
           
           <div className="flex items-center justify-between">
             <Button 
               onClick={handleRunQuery}
-              disabled={isRunning}
+              disabled={isRunning || !sseConnected}
               className="flex items-center space-x-2"
             >
-              <Play className="h-4 w-4" />
-              <span>{isRunning ? "Running..." : "Execute Query"}</span>
+              {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              <span>{isRunning ? "Executing..." : "Execute Query"}</span>
             </Button>
             
             {executionTime && (
@@ -201,6 +231,14 @@ ORDER BY anomaly_count DESC`
                 </TableBody>
               </Table>
             </div>
+          </div>
+        )}
+
+        {!sseConnected && (
+          <div className="text-center py-8 text-muted-foreground border border-dashed border-border/50 rounded-lg">
+            <Database className="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">Pipeline connection required to execute queries</p>
+            <p className="text-xs mt-1">Ensure Kafka, Spark, and Delta Lake are running</p>
           </div>
         )}
       </CardContent>

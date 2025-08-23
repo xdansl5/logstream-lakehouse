@@ -3,6 +3,7 @@ import MetricsGrid from "@/components/MetricsGrid";
 import LogStream from "@/components/LogStream";
 import AnalyticsChart from "@/components/AnalyticsChart";
 import SqlQuery from "@/components/SqlQuery";
+import PipelineStatus from "@/components/PipelineStatus";
 
 const Index = () => {
   return (
@@ -10,6 +11,15 @@ const Index = () => {
       <Header />
       
       <main className="container mx-auto px-6 py-8 space-y-8">
+        {/* Pipeline Status */}
+        <section>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-foreground">Pipeline Health</h2>
+            <p className="text-muted-foreground">Real-time status of your data pipeline components</p>
+          </div>
+          <PipelineStatus />
+        </section>
+
         {/* Metrics Overview */}
         <section>
           <div className="mb-6">
