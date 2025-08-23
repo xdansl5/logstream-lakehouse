@@ -32,7 +32,8 @@ const logger = winston.createLogger({
 class IcebergService {
   constructor() {
     this.tablePath = process.env.ICEBERG_TABLE_PATH || join(__dirname, '../data/iceberg');
-    this.duckdb = new Database(':memory:');
+    this.duckdb = null;
+    this.conn = null;
     this.ensureDataDirectory();
     this.initialized = false;
   }
@@ -40,9 +41,16 @@ class IcebergService {
   async initialize() {
     if (this.initialized) return;
     
-    await this.initializeDuckDB();
-    await this.initializeSampleData();
-    this.initialized = true;
+    try {
+      logger.info('Starting DuckDB initialization...');
+      await this.initializeDuckDB();
+      await this.initializeSampleData();
+      this.initialized = true;
+      logger.info('IcebergService initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize IcebergService:', error);
+      throw error;
+    }
   }
 
   ensureDataDirectory() {
@@ -54,49 +62,95 @@ class IcebergService {
     }
   }
 
-  initializeDuckDB() {
+  async initializeDuckDB() {
     return new Promise((resolve, reject) => {
-      this.duckdb.exec(`
-        CREATE TABLE IF NOT EXISTS logs (
-          id VARCHAR,
-          timestamp TIMESTAMP,
-          level VARCHAR,
-          source VARCHAR,
-          message VARCHAR,
-          ip VARCHAR,
-          status INTEGER,
-          response_time INTEGER,
-          endpoint VARCHAR,
-          user_id VARCHAR,
-          session_id VARCHAR
-        );
+      try {
+        logger.info('Creating DuckDB instance...');
         
-        CREATE TABLE IF NOT EXISTS iceberg_metadata (
-          table_name VARCHAR,
-          schema_version INTEGER,
-          last_updated TIMESTAMP,
-          record_count INTEGER,
-          metadata JSON
-        );
-      `, (err) => {
-        if (err) {
-          logger.error('Error initializing DuckDB:', err);
-          reject(err);
-        } else {
-          logger.info('DuckDB initialized successfully');
-          resolve();
-        }
-      });
+        // Create DuckDB instance with in-memory database
+        this.duckdb = new Database(':memory:');
+        logger.info('DuckDB instance created');
+        
+        // Create connection
+        this.conn = this.duckdb.connect();
+        logger.info('DuckDB connection established');
+        
+        // Initialize tables
+        this.createTables()
+          .then(() => {
+            logger.info('DuckDB tables initialized successfully');
+            resolve();
+          })
+          .catch(reject);
+        
+      } catch (error) {
+        logger.error('Error initializing DuckDB:', error);
+        reject(error);
+      }
+    });
+  }
+
+  async createTables() {
+    return new Promise((resolve, reject) => {
+      try {
+        // Create logs table
+        this.conn.exec(`
+          CREATE TABLE IF NOT EXISTS logs (
+            id VARCHAR,
+            timestamp TIMESTAMP,
+            level VARCHAR,
+            source VARCHAR,
+            message VARCHAR,
+            ip VARCHAR,
+            status INTEGER,
+            response_time INTEGER,
+            endpoint VARCHAR,
+            user_id VARCHAR,
+            session_id VARCHAR
+          )
+        `, (err) => {
+          if (err) {
+            logger.error('Error creating logs table:', err);
+            reject(err);
+            return;
+          }
+          logger.info('Logs table created/verified');
+
+          // Create iceberg_metadata table
+          this.conn.exec(`
+            CREATE TABLE IF NOT EXISTS iceberg_metadata (
+              table_name VARCHAR,
+              schema_version INTEGER,
+              last_updated TIMESTAMP,
+              record_count INTEGER,
+              metadata VARCHAR
+            )
+          `, (err2) => {
+            if (err2) {
+              logger.error('Error creating iceberg_metadata table:', err2);
+              reject(err2);
+              return;
+            }
+            logger.info('Iceberg metadata table created/verified');
+            resolve();
+          });
+        });
+        
+      } catch (error) {
+        logger.error('Error creating tables:', error);
+        reject(error);
+      }
     });
   }
 
   async tableExists(tableName) {
     return new Promise((resolve, reject) => {
-      this.duckdb.all(`
+      this.conn.all(`
         SELECT name FROM sqlite_master 
         WHERE type='table' AND name='${tableName}'
       `, (err, rows) => {
         if (err) {
+          logger.error(`Error checking if table ${tableName} exists:`, err);
           reject(err);
         } else {
           resolve(rows.length > 0);
@@ -110,32 +164,39 @@ class IcebergService {
       const sampleLogs = this.generateSampleLogs();
       logger.info(`Generated ${sampleLogs.length} sample logs`);
       
-      // Insert sample data into DuckDB
+      // Clear existing data
+      await this.clearTable('logs');
+      logger.info('Cleared existing logs table');
+      
+      // Insert sample data in batches
+      const batchSize = 1000;
       let successCount = 0;
       let errorCount = 0;
       
-      for (const log of sampleLogs) {
+      for (let i = 0; i < sampleLogs.length; i += batchSize) {
+        const batch = sampleLogs.slice(i, i + batchSize);
+        
         try {
+          // Create batch insert query
+          const values = batch.map(log => 
+            `('${log.id}', '${log.timestamp}', '${log.level}', '${log.source}', '${log.message}', '${log.ip}', ${log.status}, ${log.response_time}, '${log.endpoint}', '${log.user_id}', '${log.session_id}')`
+          ).join(',');
+          
           const insertQuery = `
             INSERT INTO logs (id, timestamp, level, source, message, ip, status, response_time, endpoint, user_id, session_id) 
-            VALUES ('${log.id}', '${log.timestamp}', '${log.level}', '${log.source}', '${log.message}', '${log.ip}', ${log.status}, ${log.response_time}, '${log.endpoint}', '${log.user_id}', '${log.session_id}')
+            VALUES ${values}
           `;
           
-          await new Promise((resolve, reject) => {
-            this.duckdb.exec(insertQuery, (err) => {
-              if (err) {
-                logger.warn(`Failed to insert log ${log.id}:`, err.message);
-                errorCount++;
-                resolve(); // Continue with next record
-              } else {
-                successCount++;
-                resolve();
-              }
-            });
-          });
+          await this.executeQuery(insertQuery);
+          successCount += batch.length;
+          
+          if (i % 5000 === 0) {
+            logger.info(`Inserted ${successCount} logs so far...`);
+          }
+          
         } catch (error) {
-          logger.warn(`Error inserting log ${log.id}:`, error.message);
-          errorCount++;
+          logger.warn(`Failed to insert batch starting at index ${i}:`, error.message);
+          errorCount += batch.length;
         }
       }
 
@@ -144,7 +205,7 @@ class IcebergService {
       // Update metadata
       await this.updateTableMetadata('logs', successCount);
 
-      // Save as Parquet file for Iceberg compatibility
+      // Export to Parquet file for Iceberg compatibility
       await this.exportToParquet('logs');
 
       logger.info(`Sample Iceberg table created with ${successCount} records`);
@@ -157,39 +218,65 @@ class IcebergService {
 
   async exportToParquet(tableName) {
     return new Promise((resolve, reject) => {
-      const parquetPath = join(this.tablePath, `${tableName}.parquet`);
-      
-      this.duckdb.exec(`
-        COPY (SELECT * FROM ${tableName}) TO '${parquetPath}' (FORMAT PARQUET);
-      `, (err) => {
-        if (err) {
-          logger.error('Error exporting to Parquet:', err);
-          reject(err);
-        } else {
-          logger.info(`Table ${tableName} exported to Parquet successfully`);
-          resolve();
-        }
-      });
+      try {
+        const parquetPath = join(this.tablePath, `${tableName}.parquet`);
+        
+        this.conn.exec(`
+          COPY (SELECT * FROM ${tableName}) TO '${parquetPath}' (FORMAT PARQUET)
+        `, (err) => {
+          if (err) {
+            logger.error('Error exporting to Parquet:', err);
+            reject(err);
+          } else {
+            logger.info(`Table ${tableName} exported to Parquet successfully at ${parquetPath}`);
+            resolve();
+          }
+        });
+      } catch (error) {
+        logger.error('Error exporting to Parquet:', error);
+        reject(error);
+      }
     });
   }
 
   async updateTableMetadata(tableName, recordCount) {
     return new Promise((resolve, reject) => {
-      const metadata = {
-        format: 'iceberg',
-        version: '1.0.0',
-        compression: 'snappy',
-        created_at: new Date().toISOString()
-      };
+      try {
+        const metadata = {
+          format: 'iceberg',
+          version: '1.0.0',
+          compression: 'snappy',
+          created_at: new Date().toISOString()
+        };
 
-      this.duckdb.run(`
-        INSERT OR REPLACE INTO iceberg_metadata VALUES (?, ?, ?, ?, ?)
-      `, [
-        tableName, 1, new Date().toISOString(), recordCount, JSON.stringify(metadata)
-      ], (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
+        // First clear existing metadata for this table
+        this.conn.run(`DELETE FROM iceberg_metadata WHERE table_name = ?`, [tableName], (err) => {
+          if (err) {
+            logger.error('Error clearing existing metadata:', err);
+            reject(err);
+            return;
+          }
+          
+          // Then insert new metadata using string interpolation for simplicity
+          const insertQuery = `
+            INSERT INTO iceberg_metadata VALUES ('${tableName}', 1, '${new Date().toISOString()}', ${recordCount}, '${JSON.stringify(metadata)}')
+          `;
+          
+          this.conn.run(insertQuery, (err2) => {
+            if (err2) {
+              logger.error('Error inserting table metadata:', err2);
+              reject(err2);
+            } else {
+              logger.info(`Metadata updated for table ${tableName}`);
+              resolve();
+            }
+          });
+        });
+        
+      } catch (error) {
+        logger.error('Error updating table metadata:', error);
+        reject(error);
+      }
     });
   }
 
@@ -232,44 +319,50 @@ class IcebergService {
 
   async executeQuery(query) {
     return new Promise((resolve, reject) => {
-      const startTime = Date.now();
-      
-      this.duckdb.all(query, (err, rows) => {
-        const executionTime = Date.now() - startTime;
+      try {
+        const startTime = Date.now();
         
-        if (err) {
-          logger.error('Query execution error:', err);
-          reject(err);
-        } else {
-          // Convert BigInt values to regular numbers for JSON serialization
-          const processedRows = rows.map(row => {
-            const processedRow = {};
-            Object.keys(row).forEach(key => {
-              if (typeof row[key] === 'bigint') {
-                processedRow[key] = Number(row[key]);
-              } else {
-                processedRow[key] = row[key];
-              }
-            });
-            return processedRow;
-          });
+        this.conn.all(query, (err, rows) => {
+          const executionTime = Date.now() - startTime;
           
-          logger.info(`Query executed successfully in ${executionTime}ms`);
-          resolve({
-            data: processedRows,
-            executionTime,
-            rowCount: processedRows.length,
-            query: query
-          });
-        }
-      });
+          if (err) {
+            logger.error('Query execution error:', err);
+            reject(err);
+          } else {
+            // Convert BigInt values to regular numbers for JSON serialization
+            const processedRows = rows.map(row => {
+              const processedRow = {};
+              Object.keys(row).forEach(key => {
+                if (typeof row[key] === 'bigint') {
+                  processedRow[key] = Number(row[key]);
+                } else {
+                  processedRow[key] = row[key];
+                }
+              });
+              return processedRow;
+            });
+            
+            logger.info(`Query executed successfully in ${executionTime}ms, returned ${processedRows.length} rows`);
+            resolve({
+              data: processedRows,
+              executionTime,
+              rowCount: processedRows.length,
+              query: query
+            });
+          }
+        });
+      } catch (error) {
+        logger.error('Query execution error:', error);
+        reject(error);
+      }
     });
   }
 
   async getTableSchema(tableName) {
     return new Promise((resolve, reject) => {
-      this.duckdb.all(`PRAGMA table_info(${tableName})`, (err, rows) => {
+      this.conn.all(`PRAGMA table_info(${tableName})`, (err, rows) => {
         if (err) {
+          logger.error(`Error getting table schema for ${tableName}:`, err);
           reject(err);
         } else {
           resolve(rows);
@@ -280,8 +373,9 @@ class IcebergService {
 
   async getTableData(tableName, limit = 100) {
     return new Promise((resolve, reject) => {
-      this.duckdb.all(`SELECT * FROM ${tableName} LIMIT ${limit}`, (err, rows) => {
+      this.conn.all(`SELECT * FROM ${tableName} LIMIT ${limit}`, (err, rows) => {
         if (err) {
+          logger.error(`Error getting table data for ${tableName}:`, err);
           reject(err);
         } else {
           resolve(rows);
@@ -292,7 +386,7 @@ class IcebergService {
 
   async getTableStats(tableName) {
     return new Promise((resolve, reject) => {
-      this.duckdb.all(`
+      this.conn.all(`
         SELECT 
           COUNT(*) as total_records,
           COUNT(DISTINCT level) as unique_levels,
@@ -304,6 +398,7 @@ class IcebergService {
         FROM ${tableName}
       `, (err, rows) => {
         if (err) {
+          logger.error(`Error getting table stats for ${tableName}:`, err);
           reject(err);
         } else {
           // Convert BigInt values to regular numbers for JSON serialization
@@ -323,10 +418,20 @@ class IcebergService {
 
   async close() {
     return new Promise((resolve) => {
-      this.duckdb.close(() => {
-        logger.info('DuckDB connection closed');
+      try {
+        if (this.conn) {
+          this.conn.close();
+          logger.info('DuckDB connection closed');
+        }
+        if (this.duckdb) {
+          this.duckdb.close();
+          logger.info('DuckDB instance closed');
+        }
         resolve();
-      });
+      } catch (error) {
+        logger.error('Error closing DuckDB:', error);
+        resolve();
+      }
     });
   }
 
@@ -335,12 +440,6 @@ class IcebergService {
       logger.info('Starting sample data initialization...');
       const tableExists = await this.tableExists('logs');
       logger.info(`Table 'logs' exists: ${tableExists}`);
-      
-      // Since DuckDB is in-memory, we need to recreate data every time
-      if (tableExists) {
-        logger.info('Clearing existing logs table...');
-        await this.clearTable('logs');
-      }
       
       logger.info('Creating sample logs table...');
       await this.createSampleLogsTable();
@@ -353,7 +452,7 @@ class IcebergService {
 
   async clearTable(tableName) {
     return new Promise((resolve, reject) => {
-      this.duckdb.run(`DELETE FROM ${tableName}`, (err) => {
+      this.conn.run(`DELETE FROM ${tableName}`, (err) => {
         if (err) {
           logger.error(`Error clearing table ${tableName}:`, err);
           reject(err);
