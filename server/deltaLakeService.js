@@ -1,30 +1,30 @@
-#!/usr/bin/env node
-'use strict';
+import { DeltaTable } from 'delta-lake';
+import { readFileSync, existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-const express = require('express');
-const cors = require('cors');
-const { Kafka } = require('kafkajs');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-// Note: In a real implementation, you would use the actual Delta Lake library
-// For now, we'll create a simple service that simulates Delta Lake functionality
 class DeltaLakeService {
   constructor() {
-    this.tablePath = process.env.DELTA_TABLE_PATH || './data/delta_lake';
+    this.tablePath = process.env.DELTA_TABLE_PATH || join(__dirname, '../data/delta_lake');
     this.ensureDataDirectory();
     this.initializeSampleData();
   }
 
   ensureDataDirectory() {
-    const fs = require('fs');
-    const path = require('path');
-    if (!fs.existsSync(this.tablePath)) {
-      fs.mkdirSync(this.tablePath, { recursive: true });
+    if (!existsSync(this.tablePath)) {
+      mkdirSync(this.tablePath, { recursive: true });
     }
   }
 
   async initializeSampleData() {
     try {
+      // Check if the table already exists
       const tableExists = await this.tableExists('logs');
+      
       if (!tableExists) {
         console.log('Initializing sample Delta Lake data...');
         await this.createSampleLogsTable();
@@ -36,10 +36,8 @@ class DeltaLakeService {
 
   async tableExists(tableName) {
     try {
-      const fs = require('fs');
-      const path = require('path');
-      const tablePath = path.join(this.tablePath, tableName);
-      return fs.existsSync(tablePath);
+      const tablePath = join(this.tablePath, tableName);
+      return existsSync(tablePath);
     } catch (error) {
       return false;
     }
@@ -47,14 +45,38 @@ class DeltaLakeService {
 
   async createSampleLogsTable() {
     try {
+      // Create sample log data that mimics real streaming data
       const sampleLogs = this.generateSampleLogs();
-      const fs = require('fs');
-      const path = require('path');
       
-      const tablePath = path.join(this.tablePath, 'logs');
-      fs.mkdirSync(tablePath, { recursive: true });
+      // For now, we'll create a simple JSON-based table structure
+      // In a real implementation, you would use the actual Delta Lake API
+      const tableData = {
+        schema: {
+          fields: [
+            { name: 'id', type: 'string' },
+            { name: 'timestamp', type: 'timestamp' },
+            { name: 'level', type: 'string' },
+            { name: 'source', type: 'string' },
+            { name: 'message', type: 'string' },
+            { name: 'ip', type: 'string' },
+            { name: 'status', type: 'integer' },
+            { name: 'response_time', type: 'integer' },
+            { name: 'endpoint', type: 'string' },
+            { name: 'user_id', type: 'string' },
+            { name: 'session_id', type: 'string' }
+          ]
+        },
+        data: sampleLogs
+      };
+
+      // Save the table data
+      const tablePath = join(this.tablePath, 'logs');
+      mkdirSync(tablePath, { recursive: true });
       
+      // In a real implementation, you would use Delta Lake's write API
+      // For now, we'll simulate the table structure
       console.log('Sample Delta Lake table created with', sampleLogs.length, 'records');
+      
       return true;
     } catch (error) {
       console.error('Error creating sample table:', error);
@@ -68,6 +90,7 @@ class DeltaLakeService {
     const endpoints = ['/api/users', '/api/orders', '/api/products', '/health', '/metrics'];
     const levels = ['INFO', 'WARN', 'ERROR', 'DEBUG'];
     
+    // Generate logs for the last 7 days
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
     
@@ -103,13 +126,17 @@ class DeltaLakeService {
     const startTime = Date.now();
     
     try {
+      // Parse the query to understand what we're looking for
       const queryLower = query.toLowerCase();
+      
+      // Load the table data
       const tableData = await this.loadTableData('logs');
       
       if (!tableData) {
         throw new Error('Table not found');
       }
       
+      // Execute the query based on its content
       let results = [];
       
       if (queryLower.includes('error') || queryLower.includes('status >= 400')) {
@@ -121,6 +148,7 @@ class DeltaLakeService {
       } else if (queryLower.includes('anomaly') || queryLower.includes('response_time > 1000')) {
         results = this.executeAnomalyQuery(tableData.data, query);
       } else {
+        // Default query - return recent logs
         results = tableData.data.slice(0, 100).map(log => ({
           id: log.id,
           timestamp: log.timestamp,
@@ -148,14 +176,15 @@ class DeltaLakeService {
 
   async loadTableData(tableName) {
     try {
-      const fs = require('fs');
-      const path = require('path');
-      const tablePath = path.join(this.tablePath, tableName);
+      // In a real implementation, you would load from actual Delta Lake format
+      // For now, we'll simulate loading the data
+      const tablePath = join(this.tablePath, tableName);
       
-      if (!fs.existsSync(tablePath)) {
+      if (!existsSync(tablePath)) {
         return null;
       }
       
+      // Return the sample data we generated
       return {
         schema: {
           fields: [
@@ -198,6 +227,7 @@ class DeltaLakeService {
       endpointGroups[log.endpoint].total_response_time += log.response_time;
     });
     
+    // Calculate averages
     Object.values(endpointGroups).forEach(group => {
       group.avg_response_time = Math.round(group.total_response_time / group.error_count);
       delete group.total_response_time;
@@ -261,6 +291,7 @@ class DeltaLakeService {
       hourlyGroups[hour].total_response_time += log.response_time;
     });
     
+    // Calculate averages
     Object.values(hourlyGroups).forEach(group => {
       group.avg_response_time = Math.round(group.total_response_time / group.total_requests);
       delete group.total_response_time;
@@ -316,7 +347,7 @@ class DeltaLakeService {
   async listTables() {
     try {
       const tables = [];
-      const tableNames = ['logs'];
+      const tableNames = ['logs']; // In a real implementation, you would scan the directory
       
       for (const tableName of tableNames) {
         const schema = await this.getTableSchema(tableName);
@@ -336,179 +367,4 @@ class DeltaLakeService {
   }
 }
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
-const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
-const KAFKA_TOPIC = process.env.KAFKA_TOPIC || 'web-logs';
-const KAFKA_GROUP_ID = process.env.KAFKA_GROUP_ID || 'ui-bridge-group';
-
-const app = express();
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
-
-// Initialize Delta Lake service
-const deltaLakeService = new DeltaLakeService();
-
-// In-memory list of connected SSE clients
-const sseClients = new Set();
-
-function sendSSE(res, data) {
-	res.write(`data: ${data}\n\n`);
-}
-
-function broadcast(data) {
-	for (const res of sseClients) {
-		try { sendSSE(res, data); } catch (_) {}
-	}
-}
-
-app.get('/health', (_req, res) => {
-	res.json({ status: 'ok', topic: KAFKA_TOPIC, clients: sseClients.size });
-});
-
-app.get('/events', (req, res) => {
-	res.setHeader('Content-Type', 'text/event-stream');
-	res.setHeader('Cache-Control', 'no-cache');
-	res.setHeader('Connection', 'keep-alive');
-	res.flushHeaders && res.flushHeaders();
-
-	// Initial hello event
-	sendSSE(res, JSON.stringify({ type: 'hello', message: 'connected' }));
-
-	sseClients.add(res);
-
-	req.on('close', () => {
-		sseClients.delete(res);
-		try { res.end(); } catch (_) {}
-	});
-});
-
-// Delta Lake query endpoint
-app.post('/api/query', async (req, res) => {
-	try {
-		const { query } = req.body;
-		
-		if (!query || typeof query !== 'string') {
-			return res.status(400).json({ 
-				error: 'Query is required and must be a string' 
-			});
-		}
-
-		console.log('Executing Delta Lake query:', query);
-		
-		const result = await deltaLakeService.executeQuery(query);
-		
-		res.json({
-			success: true,
-			results: result.results,
-			executionTime: result.executionTime,
-			rowCount: result.rowCount
-		});
-		
-	} catch (error) {
-		console.error('Query execution error:', error);
-		res.status(500).json({ 
-			error: error.message || 'Query execution failed' 
-		});
-	}
-});
-
-// Get table schema endpoint
-app.get('/api/tables/:tableName/schema', async (req, res) => {
-	try {
-		const { tableName } = req.params;
-		const schema = await deltaLakeService.getTableSchema(tableName);
-		
-		if (!schema) {
-			return res.status(404).json({ error: 'Table not found' });
-		}
-		
-		res.json({ schema });
-		
-	} catch (error) {
-		console.error('Schema retrieval error:', error);
-		res.status(500).json({ 
-			error: error.message || 'Failed to retrieve schema' 
-		});
-	}
-});
-
-// List tables endpoint
-app.get('/api/tables', async (req, res) => {
-	try {
-		const tables = await deltaLakeService.listTables();
-		res.json({ tables });
-		
-	} catch (error) {
-		console.error('Table listing error:', error);
-		res.status(500).json({ 
-			error: error.message || 'Failed to list tables' 
-		});
-	}
-});
-
-// Keep-alive pings to prevent proxies from closing the connection
-setInterval(() => {
-	for (const res of sseClients) {
-		try { res.write(`: ping\n\n`); } catch (_) {}
-	}
-}, 25000);
-
-function toUiLogEntry(kmsg) {
-	// kmsg is parsed JSON from Kafka value
-	const statusCode = kmsg.status_code ?? kmsg.status ?? 200;
-	let level = 'INFO';
-	if (typeof statusCode === 'number') {
-		if (statusCode >= 500) level = 'ERROR';
-		else if (statusCode >= 400) level = 'WARN';
-	}
-
-	const nowIso = new Date().toISOString();
-	return {
-		id: `${kmsg.session_id || ''}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-		timestamp: kmsg.timestamp || nowIso,
-		level,
-		source: 'kafka-consumer',
-		message: `${kmsg.method || 'GET'} ${kmsg.endpoint || '/'} -> ${statusCode} ${kmsg.response_time ?? kmsg.responseTime ?? ''}ms`,
-		ip: kmsg.ip,
-		status: statusCode,
-		responseTime: kmsg.response_time ?? kmsg.responseTime,
-		endpoint: kmsg.endpoint,
-		userId: kmsg.user_id || kmsg.userId,
-		sessionId: kmsg.session_id || kmsg.sessionId,
-	};
-}
-
-async function startKafka() {
-	const kafka = new Kafka({ clientId: 'ui-bridge', brokers: KAFKA_BROKERS });
-	const consumer = kafka.consumer({ groupId: KAFKA_GROUP_ID });
-
-	await consumer.connect();
-	await consumer.subscribe({ topic: KAFKA_TOPIC, fromBeginning: false });
-
-	console.log(`✅ Kafka consumer connected. Topic: ${KAFKA_TOPIC}, Brokers: ${KAFKA_BROKERS.join(',')}`);
-
-	await consumer.run({
-		eachMessage: async ({ message, partition, topic }) => {
-			try {
-				const raw = message.value ? message.value.toString('utf8') : '';
-				if (!raw) return;
-				const parsed = JSON.parse(raw);
-				const uiLog = toUiLogEntry(parsed);
-				broadcast(JSON.stringify(uiLog));
-			} catch (err) {
-				console.error('Failed to process Kafka message:', err);
-			}
-		},
-	});
-}
-
-startKafka().catch((err) => {
-	console.error('Kafka startup error:', err);
-	process.exitCode = 1;
-});
-
-app.listen(PORT, () => {
-	console.log(`🟢 SSE server listening on http://localhost:${PORT}`);
-	console.log(`➡️  Stream endpoint: http://localhost:${PORT}/events`);
-	console.log(`🗄️  Delta Lake API: http://localhost:${PORT}/api/query`);
-});
+export default DeltaLakeService;
