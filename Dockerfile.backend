@@ -9,14 +9,18 @@ COPY server/package*.json ./
 # Install dependencies
 RUN npm ci --only=production
 
-# Copy server code
+# Copy server source code
 COPY server/ ./
 
-# Create data directory
-RUN mkdir -p /data/delta_lake
+# Create necessary directories
+RUN mkdir -p data/iceberg data/arrow logs
 
 # Expose port
-EXPOSE 4000
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
 # Start the server
-CMD ["node", "index.js"]
+CMD ["npm", "start"]

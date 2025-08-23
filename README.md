@@ -1,258 +1,289 @@
-# Delta Lake Streaming Analytics Platform
+# 🚀 Iceberg Analytics Platform
 
-A modern web interface for querying Delta Lake databases with real-time streaming data from Spark processing pipelines.
+Una piattaforma moderna di analytics basata su **Apache Iceberg**, **DuckDB** e **Apache Arrow** per l'analisi di dati in tempo reale con un'interfaccia web React moderna.
 
-## Features
+## ✨ Caratteristiche Principali
 
-- **Real-time Delta Lake Querying**: Execute Spark SQL queries directly on your Delta Lake tables
-- **Live Data Streaming**: View real-time logs and metrics from Spark streaming processing
-- **Interactive Analytics**: Explore table schemas and get query suggestions
-- **Performance Monitoring**: Track query execution times and results
-- **Modern UI**: Beautiful, responsive interface built with React and Tailwind CSS
+- **🔍 Query SQL Avanzate**: Esecuzione di query SQL complesse su dati streaming
+- **📊 Analytics in Tempo Reale**: Aggregazioni e metriche live
+- **🌐 Interfaccia Web Moderna**: UI React con Tailwind CSS e Shadcn/ui
+- **📈 Visualizzazioni Interattive**: Grafici e dashboard dinamici
+- **🔄 Streaming Data**: Integrazione Kafka per dati in tempo reale
+- **📁 Formati Multipli**: Supporto per Iceberg, Parquet e Arrow
+- **🚀 Cross-Platform**: Nessuna compilazione nativa richiesta
 
-## Architecture
+## 🏗️ Architettura
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Web Interface │    │   Express API   │    │   Delta Lake    │
-│   (React/TS)    │◄──►│   Server        │◄──►│   Database      │
+│   React Frontend│    │  Node.js Server │    │   Apache Kafka  │
+│   (Port 5173)   │◄──►│   (Port 3001)   │◄──►│   (Port 9092)   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   SSE Stream    │    │   Kafka         │    │   Spark         │
-│   (Real-time)   │    │   Consumer      │    │   Streaming     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │   DuckDB Engine │
+                       │  + Apache Arrow │
+                       │  + Iceberg      │
+                       └─────────────────┘
 ```
 
-## Quick Start
+## 🛠️ Stack Tecnologico
 
-### Prerequisites
+### Frontend
+- **React 18** + **TypeScript**
+- **Vite** per build veloce
+- **Tailwind CSS** + **Shadcn/ui**
+- **React Query** per state management
+- **Recharts** per visualizzazioni
 
-- Node.js 18+ 
-- npm or yarn
-- Delta Lake database (or use the included sample data)
+### Backend
+- **Node.js 18+** con **ES Modules**
+- **Express.js** per API REST
+- **DuckDB** per database embedded
+- **Apache Arrow** per formati dati
+- **Apache Iceberg** per tabelle
+- **Winston** per logging moderno
 
-### Installation
+### Data Processing
+- **Kafka** per streaming
+- **Parquet** per storage efficiente
+- **Arrow** per formati ottimizzati
 
-1. **Clone and install dependencies:**
-   ```bash
-   git clone <repository-url>
-   cd delta-lake-analytics
-   npm install
-   ```
+## 🚀 Installazione Rapida
 
-2. **Install server dependencies:**
-   ```bash
-   cd server
-   npm install
-   cd ..
-   ```
+### Prerequisiti
+- **Node.js 18+** (LTS raccomandato)
+- **npm** o **yarn**
+- **Git**
 
-3. **Start the development server:**
-   ```bash
-   # Terminal 1: Start the API server
-   npm run server
-   
-   # Terminal 2: Start the frontend
-   npm run dev
-   ```
+### Setup Automatico
+```bash
+# 1. Clona il repository
+git clone <repository-url>
+cd iceberg-analytics-platform
 
-4. **Open your browser:**
-   Navigate to `http://localhost:5173` to access the web interface.
+# 2. Esegui lo script di setup
+chmod +x scripts/setup.sh
+./scripts/setup.sh
 
-## Configuration
+# 3. Avvia il server
+npm run server
 
-### Environment Variables
+# 4. In un nuovo terminale, avvia il frontend
+npm run dev
 
-Create a `.env` file in the root directory:
+# 5. Apri http://localhost:5173
+```
 
-```env
-# Server Configuration
-VITE_SERVER_URL=http://localhost:4000
-VITE_SSE_URL=http://localhost:4000/events
+### Setup Manuale
+```bash
+# 1. Installa le dipendenze frontend
+npm install
 
-# Delta Lake Configuration
-DELTA_TABLE_PATH=./data/delta_lake
+# 2. Installa le dipendenze server
+cd server
+npm install
+cd ..
 
-# Kafka Configuration (optional)
+# 3. Crea le directory necessarie
+mkdir -p data/iceberg data/arrow logs
+
+# 4. Avvia i servizi
+npm run server    # Terminal 1
+npm run dev       # Terminal 2
+```
+
+## 🧪 Testing
+
+```bash
+# Test completo del server
+npm run test:iceberg
+
+# Test specifici
+curl http://localhost:3001/health
+curl http://localhost:3001/api/tables
+```
+
+## 📊 API Endpoints
+
+### Core API
+- `GET /health` - Health check del server
+- `GET /api/tables` - Lista delle tabelle disponibili
+- `GET /api/tables/:name/schema` - Schema di una tabella
+- `GET /api/tables/:name/data` - Dati di una tabella
+- `GET /api/tables/:name/stats` - Statistiche di una tabella
+
+### Query Execution
+- `POST /api/query` - Esegue query SQL
+- `POST /api/ingest` - Ingestione di nuovi dati
+
+### Real-time
+- `GET /events` - Server-Sent Events per aggiornamenti live
+
+## 🐳 Docker Deployment
+
+```bash
+# Avvia tutti i servizi
+docker-compose up -d
+
+# Verifica lo stato
+docker-compose ps
+
+# Logs
+docker-compose logs -f backend
+
+# Ferma i servizi
+docker-compose down
+```
+
+## 🔧 Configurazione
+
+### Variabili d'Ambiente
+```bash
+# Server
+PORT=3001
+NODE_ENV=production
+
+# Iceberg
+ICEBERG_TABLE_PATH=./data/iceberg
+ARROW_DATA_PATH=./data/arrow
+
+# Kafka (opzionale)
 KAFKA_BROKERS=localhost:9092
 KAFKA_TOPIC=web-logs
 KAFKA_GROUP_ID=ui-bridge-group
 ```
 
-### Delta Lake Setup
+### File di Configurazione
+- `.env` - Variabili d'ambiente
+- `server/package.json` - Dipendenze server
+- `package.json` - Dipendenze frontend
+- `docker-compose.yml` - Orchestrazione Docker
 
-The platform includes a sample Delta Lake service that simulates real Delta Lake functionality. In a production environment, you would:
+## 📈 Esempi di Query
 
-1. **Connect to your actual Delta Lake instance**
-2. **Configure Spark SQL connectivity**
-3. **Set up proper authentication and security**
-
-## Usage
-
-### 1. Explore Tables
-
-- Navigate to the "Delta Lake Analytics" section
-- Click on table names to view schemas
-- See available columns and data types
-
-### 2. Execute Queries
-
-- Use the query editor to write Spark SQL queries
-- Click "Execute Query" to run against your Delta Lake
-- View results in the formatted table below
-
-### 3. Query Suggestions
-
-The platform provides pre-built query templates:
-
-- **Recent Activity**: Latest log entries
-- **Error Analysis**: Error patterns and trends
-- **Performance Metrics**: Response time analysis
-- **User Session Analysis**: User behavior insights
-- **Anomaly Detection**: Identify unusual patterns
-- **Hourly Trends**: Time-based analytics
-
-### 4. Sample Queries
-
+### Analisi degli Errori
 ```sql
--- Error analysis
-SELECT 
-  endpoint,
-  count(*) as error_count,
-  avg(response_time) as avg_response_time
-FROM delta_lake.logs 
+SELECT endpoint, COUNT(*) as error_count, AVG(response_time) as avg_response_time
+FROM logs 
 WHERE status >= 400 
-  AND timestamp >= current_timestamp() - interval 24 hours
+  AND timestamp >= current_timestamp() - INTERVAL 24 HOURS
 GROUP BY endpoint
-ORDER BY error_count DESC;
+ORDER BY error_count DESC
+```
 
--- Performance metrics
-SELECT 
-  source,
-  count(*) as total_requests,
-  avg(response_time) as avg_response_time
-FROM delta_lake.logs
-WHERE timestamp >= current_timestamp() - interval 1 day
+### Metriche di Performance
+```sql
+SELECT source, COUNT(*) as total_requests, AVG(response_time) as avg_response_time
+FROM logs
+WHERE timestamp >= current_timestamp() - INTERVAL 1 DAY
 GROUP BY source
-ORDER BY total_requests DESC;
+ORDER BY total_requests DESC
+```
 
--- User session analysis
-SELECT 
-  user_id,
-  count(distinct session_id) as unique_sessions,
-  count(*) as total_requests
-FROM delta_lake.logs
+### Analisi delle Sessioni
+```sql
+SELECT user_id, COUNT(DISTINCT session_id) as unique_sessions, COUNT(*) as total_requests
+FROM logs
 WHERE timestamp >= current_date()
 GROUP BY user_id
 HAVING total_requests > 10
-ORDER BY total_requests DESC;
+ORDER BY total_requests DESC
 ```
 
-## API Endpoints
+## 🔍 Troubleshooting
 
-### Query Execution
-```http
-POST /api/query
-Content-Type: application/json
+### Problemi Comuni
 
-{
-  "query": "SELECT * FROM delta_lake.logs LIMIT 10"
-}
+#### Server non si avvia
+```bash
+# Verifica la porta
+lsof -i :3001
+
+# Controlla i log
+tail -f logs/server.log
 ```
 
-### Table Schema
-```http
-GET /api/tables/{tableName}/schema
+#### Dipendenze non installate
+```bash
+# Rimuovi node_modules e reinstalla
+rm -rf node_modules package-lock.json
+npm install
 ```
 
-### List Tables
-```http
-GET /api/tables
+#### Problemi di permessi
+```bash
+# Verifica i permessi delle directory
+ls -la data/ logs/
+chmod -R 755 data/ logs/
 ```
 
-### Real-time Events
-```http
-GET /events
+### Log e Debug
+- **Server logs**: `logs/server.log`
+- **Iceberg logs**: `logs/iceberg-service.log`
+- **Arrow logs**: `logs/arrow-service.log`
+
+## 🚀 Sviluppo
+
+### Struttura del Progetto
+```
+├── src/                    # Frontend React
+├── server/                 # Backend Node.js
+│   ├── index.js           # Server principale
+│   ├── icebergService.js  # Servizio Iceberg
+│   └── arrowService.js    # Servizio Arrow
+├── scripts/                # Script di setup e utility
+├── data/                   # Dati e tabelle
+│   ├── iceberg/           # Tabelle Iceberg
+│   └── arrow/             # File Arrow/Parquet
+└── logs/                   # File di log
 ```
 
-## Development
+### Comandi di Sviluppo
+```bash
+# Sviluppo frontend
+npm run dev
 
-### Project Structure
+# Sviluppo backend con hot reload
+cd server && npm run dev
 
-```
-├── src/
-│   ├── components/          # React components
-│   │   ├── SqlQuery.tsx     # Query interface
-│   │   ├── DeltaLakeExplorer.tsx # Table explorer
-│   │   └── ...
-│   ├── contexts/            # React contexts
-│   │   └── DataContext.tsx  # Data management
-│   └── pages/               # Page components
-├── server/
-│   ├── index.js             # Express API server
-│   └── deltaLakeService.js  # Delta Lake integration
-└── data/
-    └── delta_lake/          # Sample Delta Lake data
+# Build di produzione
+npm run build
+
+# Linting
+npm run lint
+
+# Testing
+npm run test:iceberg
 ```
 
-### Adding New Features
+## 📚 Risorse Aggiuntive
 
-1. **New Query Types**: Extend the `DeltaLakeService` class
-2. **UI Components**: Add React components in `src/components/`
-3. **API Endpoints**: Add routes in `server/index.js`
+- [Apache Iceberg Documentation](https://iceberg.apache.org/)
+- [DuckDB Documentation](https://duckdb.org/docs/)
+- [Apache Arrow Documentation](https://arrow.apache.org/)
+- [React Documentation](https://react.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
 
-## Production Deployment
+## 🤝 Contributi
 
-### Docker Setup
+1. Fork del repository
+2. Crea un branch per la feature (`git checkout -b feature/AmazingFeature`)
+3. Commit delle modifiche (`git commit -m 'Add some AmazingFeature'`)
+4. Push al branch (`git push origin feature/AmazingFeature`)
+5. Apri una Pull Request
 
-```dockerfile
-# Frontend
-FROM node:18-alpine AS frontend
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-RUN npm run build
+## 📄 Licenza
 
-# Backend
-FROM node:18-alpine AS backend
-WORKDIR /app
-COPY server/package*.json ./
-RUN npm ci --only=production
-COPY server/ ./
+Questo progetto è rilasciato sotto licenza MIT. Vedi `LICENSE` per i dettagli.
 
-EXPOSE 4000
-CMD ["node", "index.js"]
-```
+## 🆘 Supporto
 
-### Environment Configuration
+- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
+- **Documentazione**: [Wiki](https://github.com/your-repo/wiki)
+- **Email**: support@your-domain.com
 
-Set production environment variables:
+---
 
-```env
-NODE_ENV=production
-DELTA_TABLE_PATH=/data/delta_lake
-KAFKA_BROKERS=kafka1:9092,kafka2:9092
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Support
-
-For issues and questions:
-- Create an issue in the repository
-- Check the documentation
-- Review the sample queries and configurations
+**⭐ Se questo progetto ti è utile, considera di dargli una stella su GitHub!**

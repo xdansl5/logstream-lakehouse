@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Delta Lake Analytics Platform Setup Script
-echo "🚀 Setting up Delta Lake Analytics Platform..."
+# Iceberg Analytics Platform Setup Script
+echo "🚀 Setting up Iceberg Analytics Platform..."
 
 # Check if Node.js is installed
 if ! command -v node &> /dev/null; then
@@ -29,20 +29,23 @@ cd server
 npm install
 cd ..
 
-# Create data directory
+# Create data directories
 echo "📁 Creating data directories..."
-mkdir -p data/delta_lake
+mkdir -p data/iceberg
+mkdir -p data/arrow
+mkdir -p logs
 
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
     echo "⚙️  Creating .env file..."
     cat > .env << EOF
 # Server Configuration
-VITE_SERVER_URL=http://localhost:4000
-VITE_SSE_URL=http://localhost:4000/events
+VITE_SERVER_URL=http://localhost:3001
+VITE_SSE_URL=http://localhost:3001/events
 
-# Delta Lake Configuration
-DELTA_TABLE_PATH=./data/delta_lake
+# Iceberg Configuration
+ICEBERG_TABLE_PATH=./data/iceberg
+ARROW_DATA_PATH=./data/arrow
 
 # Kafka Configuration (optional)
 KAFKA_BROKERS=localhost:9092
@@ -63,3 +66,5 @@ echo "  2. Terminal 2: npm run dev"
 echo "  3. Open: http://localhost:5173"
 echo ""
 echo "📚 For more information, see README.md"
+echo ""
+echo "🧪 To test the server: npm run test:iceberg"
