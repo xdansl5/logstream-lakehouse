@@ -1,16 +1,88 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
+import { Loader2, Wifi, WifiOff } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
 
 const AnalyticsChart = () => {
-  const { chartData } = useData();
+  const { chartData, sseConnected, loading } = useData();
+
+  const getConnectionStatus = () => {
+    if (loading) {
+      return { icon: <Loader2 className="h-4 w-4 animate-spin" />, text: "Loading data...", color: "text-muted-foreground" };
+    }
+    if (sseConnected) {
+      return { icon: <Wifi className="h-4 w-4" />, text: "Live data", color: "text-green-500" };
+    }
+    return { icon: <WifiOff className="h-4 w-4" />, text: "No data", color: "text-red-500" };
+  };
+
+  const connectionStatus = getConnectionStatus();
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {Array.from({ length: 2 }).map((_, index) => (
+          <Card key={index} className="border-border/50 bg-card/50 backdrop-blur">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold flex items-center space-x-2">
+                <span>{index === 0 ? "Request Volume" : "Error Rate & Response Time"}</span>
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">Connecting to pipeline...</p>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                  <p>Loading real-time data...</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (!sseConnected || chartData.length === 0) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {Array.from({ length: 2 }).map((_, index) => (
+          <Card key={index} className="border-border/50 bg-card/50 backdrop-blur">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold flex items-center space-x-2">
+                <span>{index === 0 ? "Request Volume" : "Error Rate & Response Time"}</span>
+                <WifiOff className="h-4 w-4 text-red-500" />
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">Pipeline connection required</p>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <WifiOff className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No data available</p>
+                  <p className="text-xs mt-1">Ensure pipeline is running</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card className="border-border/50 bg-card/50 backdrop-blur">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Request Volume</CardTitle>
-          <p className="text-sm text-muted-foreground">Real-time request processing</p>
+          <CardTitle className="text-lg font-semibold flex items-center space-x-2">
+            <span>Request Volume</span>
+            <span className={`flex items-center space-x-1 ${connectionStatus.color}`}>
+              {connectionStatus.icon}
+              <span className="text-xs">{connectionStatus.text}</span>
+            </span>
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">Real-time request processing from pipeline</p>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
@@ -53,8 +125,14 @@ const AnalyticsChart = () => {
 
       <Card className="border-border/50 bg-card/50 backdrop-blur">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Error Rate & Response Time</CardTitle>
-          <p className="text-sm text-muted-foreground">Performance monitoring</p>
+          <CardTitle className="text-lg font-semibold flex items-center space-x-2">
+            <span>Error Rate & Response Time</span>
+            <span className={`flex items-center space-x-1 ${connectionStatus.color}`}>
+              {connectionStatus.icon}
+              <span className="text-xs">{connectionStatus.text}</span>
+            </span>
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">Performance monitoring from pipeline</p>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
