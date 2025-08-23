@@ -1,0 +1,19 @@
+{
+  "name": "delta-lake-server",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "kafkajs": "^2.2.4",
+    "delta-lake": "^2.4.0",
+    "apache-arrow": "^15.0.0",
+    "sqlite3": "^5.1.6",
+    "better-sqlite3": "^9.4.3"
+  }
+}

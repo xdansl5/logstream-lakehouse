@@ -1,0 +1,22 @@
+# Backend Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY server/package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy server code
+COPY server/ ./
+
+# Create data directory
+RUN mkdir -p /data/delta_lake
+
+# Expose port
+EXPOSE 4000
+
+# Start the server
+CMD ["node", "index.js"]

@@ -246,49 +246,32 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, [logs]);
 
-  // Simulate Spark SQL query execution
+  // Execute real Delta Lake queries via API
   const executeQuery = useCallback(async (query: string): Promise<{ results: QueryResult[]; executionTime: string }> => {
-    // Simulate query processing time
-    await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 1000));
-    
-    const executionTime = `${(Math.random() * 2 + 0.5).toFixed(2)}s`;
-    
-    // Generate realistic results based on query content
-    let results: QueryResult[] = [];
-    
-    if (query.toLowerCase().includes('error') || query.toLowerCase().includes('status_code >= 400')) {
-      // Error analysis query
-      results = [
-        { endpoint: "/api/users", error_count: 15, avg_response_time: 2140 },
-        { endpoint: "/api/orders", error_count: 8, avg_response_time: 1890 },
-        { endpoint: "/api/products", error_count: 12, avg_response_time: 2340 },
-        { endpoint: "/health", error_count: 2, avg_response_time: 890 },
-        { endpoint: "/metrics", error_count: 5, avg_response_time: 1120 }
-      ];
-    } else if (query.toLowerCase().includes('user') || query.toLowerCase().includes('session')) {
-      // User session analysis
-      results = Array.from({ length: 10 }, (_, i) => ({
-        user_id: `user_${i + 1}`,
-        sessions: Math.floor(Math.random() * 5) + 1,
-        page_views: Math.floor(Math.random() * 50) + 10,
-        total_time: Math.floor(Math.random() * 3600) + 300
-      }));
-    } else {
-      // Default hourly metrics
-      results = Array.from({ length: 10 }, (_, i) => {
-        const hour = new Date();
-        hour.setHours(hour.getHours() - i);
-        
-        return {
-          hour: hour.toISOString().substring(0, 16).replace('T', ' '),
-          total_requests: Math.floor(Math.random() * 1000) + 2000,
-          errors: Math.floor(Math.random() * 50) + 5,
-          avg_response_time: Math.floor(Math.random() * 200) + 100
-        };
+    try {
+      const serverUrl = (import.meta as any).env?.VITE_SERVER_URL ?? 'http://localhost:4000';
+      const response = await fetch(`${serverUrl}/api/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Query execution failed');
+      }
+
+      const data = await response.json();
+      return {
+        results: data.results || [],
+        executionTime: data.executionTime || '0s'
+      };
+    } catch (error) {
+      console.error('Delta Lake query error:', error);
+      throw new Error(`Query execution failed: ${error.message}`);
     }
-    
-    return { results, executionTime };
   }, []);
 
   const clearLogs = useCallback(() => {

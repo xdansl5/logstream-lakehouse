@@ -24,6 +24,18 @@ GROUP BY date_format(timestamp, 'yyyy-MM-dd HH:mm')
 ORDER BY hour DESC
 LIMIT 10`
   );
+
+  // Listen for query load events from DeltaLakeExplorer
+  useEffect(() => {
+    const handleLoadQuery = (event: CustomEvent) => {
+      setQuery(event.detail);
+    };
+
+    window.addEventListener('loadQuery', handleLoadQuery as EventListener);
+    return () => {
+      window.removeEventListener('loadQuery', handleLoadQuery as EventListener);
+    };
+  }, []);
   
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<any[]>([]);

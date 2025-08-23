@@ -3,6 +3,7 @@ import MetricsGrid from "@/components/MetricsGrid";
 import LogStream from "@/components/LogStream";
 import AnalyticsChart from "@/components/AnalyticsChart";
 import SqlQuery from "@/components/SqlQuery";
+import DeltaLakeExplorer from "@/components/DeltaLakeExplorer";
 
 const Index = () => {
   return (
@@ -37,13 +38,20 @@ const Index = () => {
           <LogStream />
         </section>
 
-        {/* SQL Query Interface */}
+        {/* Delta Lake Analytics */}
         <section>
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-foreground">Interactive Analytics</h2>
-            <p className="text-muted-foreground">Query your Delta Lake with Spark SQL</p>
+            <h2 className="text-2xl font-bold text-foreground">Delta Lake Analytics</h2>
+            <p className="text-muted-foreground">Interactive querying of your streaming data lake</p>
           </div>
-          <SqlQuery />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <DeltaLakeExplorer onQuerySelect={(query) => {
+              // This will be handled by the SqlQuery component
+              const event = new CustomEvent('loadQuery', { detail: query });
+              window.dispatchEvent(event);
+            }} />
+            <SqlQuery />
+          </div>
         </section>
       </main>
     </div>

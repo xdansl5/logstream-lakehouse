@@ -9,7 +9,11 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "server": "node server/index.js"
+    "server": "node server/index.js",
+    "setup": "./scripts/setup.sh",
+    "test:delta": "node scripts/test-delta-lake.js",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -63,7 +67,8 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
