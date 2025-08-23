@@ -1,514 +1,261 @@
 #!/usr/bin/env node
 'use strict';
 
-const express = require('express');
-const cors = require('cors');
-const { Kafka } = require('kafkajs');
+import express from 'express';
+import cors from 'cors';
+import { Kafka } from 'kafkajs';
+import IcebergService from './icebergService.js';
+import winston from 'winston';
 
-// Note: In a real implementation, you would use the actual Delta Lake library
-// For now, we'll create a simple service that simulates Delta Lake functionality
-class DeltaLakeService {
-  constructor() {
-    this.tablePath = process.env.DELTA_TABLE_PATH || './data/delta_lake';
-    this.ensureDataDirectory();
-    this.initializeSampleData();
-  }
-
-  ensureDataDirectory() {
-    const fs = require('fs');
-    const path = require('path');
-    if (!fs.existsSync(this.tablePath)) {
-      fs.mkdirSync(this.tablePath, { recursive: true });
-    }
-  }
-
-  async initializeSampleData() {
-    try {
-      const tableExists = await this.tableExists('logs');
-      if (!tableExists) {
-        console.log('Initializing sample Delta Lake data...');
-        await this.createSampleLogsTable();
-      }
-    } catch (error) {
-      console.error('Error initializing sample data:', error);
-    }
-  }
-
-  async tableExists(tableName) {
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const tablePath = path.join(this.tablePath, tableName);
-      return fs.existsSync(tablePath);
-    } catch (error) {
-      return false;
-    }
-  }
-
-  async createSampleLogsTable() {
-    try {
-      const sampleLogs = this.generateSampleLogs();
-      const fs = require('fs');
-      const path = require('path');
-      
-      const tablePath = path.join(this.tablePath, 'logs');
-      fs.mkdirSync(tablePath, { recursive: true });
-      
-      console.log('Sample Delta Lake table created with', sampleLogs.length, 'records');
-      return true;
-    } catch (error) {
-      console.error('Error creating sample table:', error);
-      return false;
-    }
-  }
-
-  generateSampleLogs() {
-    const logs = [];
-    const sources = ['spark-streaming', 'kafka-consumer', 'delta-writer', 'web-server', 'api-gateway'];
-    const endpoints = ['/api/users', '/api/orders', '/api/products', '/health', '/metrics'];
-    const levels = ['INFO', 'WARN', 'ERROR', 'DEBUG'];
-    
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-    
-    for (let i = 0; i < 10000; i++) {
-      const timestamp = new Date(sevenDaysAgo.getTime() + Math.random() * (now.getTime() - sevenDaysAgo.getTime()));
-      const source = sources[Math.floor(Math.random() * sources.length)];
-      const endpoint = endpoints[Math.floor(Math.random() * endpoints.length)];
-      const level = levels[Math.floor(Math.random() * levels.length)];
-      const status = level === 'ERROR' ? 
-        (Math.random() > 0.5 ? 500 : 404) : 
-        (Math.random() > 0.1 ? 200 : 400);
-      const responseTime = Math.floor(Math.random() * 2000) + 50;
-      
-      logs.push({
-        id: `log_${i}_${Date.now()}`,
-        timestamp: timestamp.toISOString(),
-        level,
-        source,
-        message: `${source} processing ${endpoint} - ${level.toLowerCase()} level event`,
-        ip: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-        status,
-        response_time: responseTime,
-        endpoint,
-        user_id: `user_${Math.floor(Math.random() * 1000)}`,
-        session_id: `sess_${Math.random().toString(36).substr(2, 8)}`
-      });
-    }
-    
-    return logs;
-  }
-
-  async executeQuery(query) {
-    const startTime = Date.now();
-    
-    try {
-      const queryLower = query.toLowerCase();
-      const tableData = await this.loadTableData('logs');
-      
-      if (!tableData) {
-        throw new Error('Table not found');
-      }
-      
-      let results = [];
-      
-      if (queryLower.includes('error') || queryLower.includes('status >= 400')) {
-        results = this.executeErrorAnalysisQuery(tableData.data, query);
-      } else if (queryLower.includes('user') || queryLower.includes('session')) {
-        results = this.executeUserAnalysisQuery(tableData.data, query);
-      } else if (queryLower.includes('hour') || queryLower.includes('date_format')) {
-        results = this.executeTimeSeriesQuery(tableData.data, query);
-      } else if (queryLower.includes('anomaly') || queryLower.includes('response_time > 1000')) {
-        results = this.executeAnomalyQuery(tableData.data, query);
-      } else {
-        results = tableData.data.slice(0, 100).map(log => ({
-          id: log.id,
-          timestamp: log.timestamp,
-          level: log.level,
-          source: log.source,
-          message: log.message,
-          status: log.status,
-          response_time: log.response_time
-        }));
-      }
-      
-      const executionTime = ((Date.now() - startTime) / 1000).toFixed(2);
-      
-      return {
-        results,
-        executionTime: `${executionTime}s`,
-        rowCount: results.length
-      };
-      
-    } catch (error) {
-      console.error('Query execution error:', error);
-      throw new Error(`Query execution failed: ${error.message}`);
-    }
-  }
-
-  async loadTableData(tableName) {
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const tablePath = path.join(this.tablePath, tableName);
-      
-      if (!fs.existsSync(tablePath)) {
-        return null;
-      }
-      
-      return {
-        schema: {
-          fields: [
-            { name: 'id', type: 'string' },
-            { name: 'timestamp', type: 'timestamp' },
-            { name: 'level', type: 'string' },
-            { name: 'source', type: 'string' },
-            { name: 'message', type: 'string' },
-            { name: 'ip', type: 'string' },
-            { name: 'status', type: 'integer' },
-            { name: 'response_time', type: 'integer' },
-            { name: 'endpoint', type: 'string' },
-            { name: 'user_id', type: 'string' },
-            { name: 'session_id', type: 'string' }
-          ]
-        },
-        data: this.generateSampleLogs()
-      };
-    } catch (error) {
-      console.error('Error loading table data:', error);
-      return null;
-    }
-  }
-
-  executeErrorAnalysisQuery(data, query) {
-    const errors = data.filter(log => log.status >= 400);
-    const endpointGroups = {};
-    
-    errors.forEach(log => {
-      if (!endpointGroups[log.endpoint]) {
-        endpointGroups[log.endpoint] = {
-          endpoint: log.endpoint,
-          error_count: 0,
-          avg_response_time: 0,
-          total_response_time: 0
-        };
-      }
-      
-      endpointGroups[log.endpoint].error_count++;
-      endpointGroups[log.endpoint].total_response_time += log.response_time;
-    });
-    
-    Object.values(endpointGroups).forEach(group => {
-      group.avg_response_time = Math.round(group.total_response_time / group.error_count);
-      delete group.total_response_time;
-    });
-    
-    return Object.values(endpointGroups)
-      .sort((a, b) => b.error_count - a.error_count)
-      .slice(0, 10);
-  }
-
-  executeUserAnalysisQuery(data, query) {
-    const userGroups = {};
-    
-    data.forEach(log => {
-      if (!userGroups[log.user_id]) {
-        userGroups[log.user_id] = {
-          user_id: log.user_id,
-          sessions: new Set(),
-          page_views: 0,
-          total_time: 0
-        };
-      }
-      
-      userGroups[log.user_id].sessions.add(log.session_id);
-      userGroups[log.user_id].page_views++;
-      userGroups[log.user_id].total_time += log.response_time;
-    });
-    
-    return Object.values(userGroups)
-      .map(group => ({
-        user_id: group.user_id,
-        sessions: group.sessions.size,
-        page_views: group.page_views,
-        total_time: group.total_time
-      }))
-      .sort((a, b) => b.page_views - a.page_views)
-      .slice(0, 10);
-  }
-
-  executeTimeSeriesQuery(data, query) {
-    const hourlyGroups = {};
-    
-    data.forEach(log => {
-      const timestamp = new Date(log.timestamp);
-      const hour = timestamp.toISOString().substring(0, 16).replace('T', ' ');
-      
-      if (!hourlyGroups[hour]) {
-        hourlyGroups[hour] = {
-          hour,
-          total_requests: 0,
-          errors: 0,
-          avg_response_time: 0,
-          total_response_time: 0
-        };
-      }
-      
-      hourlyGroups[hour].total_requests++;
-      if (log.status >= 400) {
-        hourlyGroups[hour].errors++;
-      }
-      hourlyGroups[hour].total_response_time += log.response_time;
-    });
-    
-    Object.values(hourlyGroups).forEach(group => {
-      group.avg_response_time = Math.round(group.total_response_time / group.total_requests);
-      delete group.total_response_time;
-    });
-    
-    return Object.values(hourlyGroups)
-      .sort((a, b) => new Date(b.hour) - new Date(a.hour))
-      .slice(0, 24);
-  }
-
-  executeAnomalyQuery(data, query) {
-    const anomalies = data.filter(log => 
-      log.level === 'ERROR' || log.response_time > 1000
-    );
-    
-    const anomalyGroups = {};
-    
-    anomalies.forEach(log => {
-      const key = `${log.endpoint}_${log.source}_${log.level}`;
-      
-      if (!anomalyGroups[key]) {
-        anomalyGroups[key] = {
-          endpoint: log.endpoint,
-          source: log.source,
-          level: log.level,
-          anomaly_count: 0,
-          max_response_time: 0
-        };
-      }
-      
-      anomalyGroups[key].anomaly_count++;
-      anomalyGroups[key].max_response_time = Math.max(
-        anomalyGroups[key].max_response_time, 
-        log.response_time
-      );
-    });
-    
-    return Object.values(anomalyGroups)
-      .sort((a, b) => b.anomaly_count - a.anomaly_count)
-      .slice(0, 10);
-  }
-
-  async getTableSchema(tableName) {
-    try {
-      const tableData = await this.loadTableData(tableName);
-      return tableData ? tableData.schema : null;
-    } catch (error) {
-      console.error('Error getting table schema:', error);
-      return null;
-    }
-  }
-
-  async listTables() {
-    try {
-      const tables = [];
-      const tableNames = ['logs'];
-      
-      for (const tableName of tableNames) {
-        const schema = await this.getTableSchema(tableName);
-        if (schema) {
-          tables.push({
-            name: tableName,
-            schema: schema
-          });
-        }
-      }
-      
-      return tables;
-    } catch (error) {
-      console.error('Error listing tables:', error);
-      return [];
-    }
-  }
-}
-
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
-const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
-const KAFKA_TOPIC = process.env.KAFKA_TOPIC || 'web-logs';
-const KAFKA_GROUP_ID = process.env.KAFKA_GROUP_ID || 'ui-bridge-group';
+// Configure modern logging
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    }),
+    new winston.transports.File({ filename: 'logs/server.log' })
+  ]
+});
 
 const app = express();
-app.use(cors({ origin: true, credentials: true }));
+const port = process.env.PORT || 3001;
+
+// Initialize Iceberg service
+const icebergService = new IcebergService();
+
+// Initialize the service
+logger.info('Starting Iceberg service initialization...');
+icebergService.initialize()
+  .then(() => {
+    logger.info('Iceberg service initialized successfully');
+  })
+  .catch(err => {
+    logger.error('Failed to initialize Iceberg service:', err);
+  });
+
+// Middleware
+app.use(cors());
 app.use(express.json());
 
-// Initialize Delta Lake service
-const deltaLakeService = new DeltaLakeService();
-
-// In-memory list of connected SSE clients
-const sseClients = new Set();
-
-function sendSSE(res, data) {
-	res.write(`data: ${data}\n\n`);
-}
-
-function broadcast(data) {
-	for (const res of sseClients) {
-		try { sendSSE(res, data); } catch (_) {}
-	}
-}
-
-app.get('/health', (_req, res) => {
-	res.json({ status: 'ok', topic: KAFKA_TOPIC, clients: sseClients.size });
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    service: 'iceberg-analytics-server',
+    timestamp: new Date().toISOString(),
+    version: '2.0.0'
+  });
 });
 
-app.get('/events', (req, res) => {
-	res.setHeader('Content-Type', 'text/event-stream');
-	res.setHeader('Cache-Control', 'no-cache');
-	res.setHeader('Connection', 'keep-alive');
-	res.flushHeaders && res.flushHeaders();
-
-	// Initial hello event
-	sendSSE(res, JSON.stringify({ type: 'hello', message: 'connected' }));
-
-	sseClients.add(res);
-
-	req.on('close', () => {
-		sseClients.delete(res);
-		try { res.end(); } catch (_) {}
-	});
-});
-
-// Delta Lake query endpoint
+// Query execution endpoint
 app.post('/api/query', async (req, res) => {
-	try {
-		const { query } = req.body;
-		
-		if (!query || typeof query !== 'string') {
-			return res.status(400).json({ 
-				error: 'Query is required and must be a string' 
-			});
-		}
+  try {
+    const { query } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
 
-		console.log('Executing Delta Lake query:', query);
-		
-		const result = await deltaLakeService.executeQuery(query);
-		
-		res.json({
-			success: true,
-			results: result.results,
-			executionTime: result.executionTime,
-			rowCount: result.rowCount
-		});
-		
-	} catch (error) {
-		console.error('Query execution error:', error);
-		res.status(500).json({ 
-			error: error.message || 'Query execution failed' 
-		});
-	}
+    logger.info(`Executing query: ${query}`);
+    const result = await icebergService.executeQuery(query);
+    
+    res.json({
+      success: true,
+      data: result.data,
+      executionTime: result.executionTime,
+      rowCount: result.rowCount,
+      query: result.query
+    });
+  } catch (error) {
+    logger.error('Query execution error:', error);
+    res.status(500).json({ 
+      error: 'Query execution failed', 
+      details: error.message 
+    });
+  }
 });
 
-// Get table schema endpoint
-app.get('/api/tables/:tableName/schema', async (req, res) => {
-	try {
-		const { tableName } = req.params;
-		const schema = await deltaLakeService.getTableSchema(tableName);
-		
-		if (!schema) {
-			return res.status(404).json({ error: 'Table not found' });
-		}
-		
-		res.json({ schema });
-		
-	} catch (error) {
-		console.error('Schema retrieval error:', error);
-		res.status(500).json({ 
-			error: error.message || 'Failed to retrieve schema' 
-		});
-	}
+// Get table schema
+app.get('/api/tables/:name/schema', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const schema = await icebergService.getTableSchema(name);
+    
+    res.json({
+      success: true,
+      tableName: name,
+      schema: schema
+    });
+  } catch (error) {
+    logger.error('Schema retrieval error:', error);
+    res.status(500).json({ 
+      error: 'Failed to retrieve schema', 
+      details: error.message 
+    });
+  }
 });
 
-// List tables endpoint
+// Get table data
+app.get('/api/tables/:name/data', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { limit = 100 } = req.query;
+    const data = await icebergService.getTableData(name, parseInt(limit));
+    
+    res.json({
+      success: true,
+      tableName: name,
+      data: data,
+      limit: parseInt(limit)
+    });
+  } catch (error) {
+    logger.error('Data retrieval error:', error);
+    res.status(500).json({ 
+      error: 'Failed to retrieve data', 
+      details: error.message 
+    });
+  }
+});
+
+// Get table statistics
+app.get('/api/tables/:name/stats', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const stats = await icebergService.getTableStats(name);
+    
+    res.json({
+      success: true,
+      tableName: name,
+      stats: stats
+    });
+  } catch (error) {
+    logger.error('Stats retrieval error:', error);
+    res.status(500).json({ 
+      error: 'Failed to retrieve statistics', 
+      details: error.message 
+    });
+  }
+});
+
+// List available tables
 app.get('/api/tables', async (req, res) => {
-	try {
-		const tables = await deltaLakeService.listTables();
-		res.json({ tables });
-		
-	} catch (error) {
-		console.error('Table listing error:', error);
-		res.status(500).json({ 
-			error: error.message || 'Failed to list tables' 
-		});
-	}
+  try {
+    // For now, return the logs table
+    // In a real implementation, you'd scan the Iceberg catalog
+    res.json({
+      success: true,
+      tables: [
+        {
+          name: 'logs',
+          type: 'iceberg',
+          recordCount: 10000,
+          lastUpdated: new Date().toISOString()
+        }
+      ]
+    });
+  } catch (error) {
+    logger.error('Table listing error:', error);
+    res.status(500).json({ 
+      error: 'Failed to list tables', 
+      details: error.message 
+    });
+  }
 });
 
-// Keep-alive pings to prevent proxies from closing the connection
-setInterval(() => {
-	for (const res of sseClients) {
-		try { res.write(`: ping\n\n`); } catch (_) {}
-	}
-}, 25000);
+// Kafka integration endpoint
+app.post('/api/ingest', async (req, res) => {
+  try {
+    const { data } = req.body;
+    
+    if (!data || !Array.isArray(data)) {
+      return res.status(400).json({ error: 'Data array is required' });
+    }
 
-function toUiLogEntry(kmsg) {
-	// kmsg is parsed JSON from Kafka value
-	const statusCode = kmsg.status_code ?? kmsg.status ?? 200;
-	let level = 'INFO';
-	if (typeof statusCode === 'number') {
-		if (statusCode >= 500) level = 'ERROR';
-		else if (statusCode >= 400) level = 'WARN';
-	}
-
-	const nowIso = new Date().toISOString();
-	return {
-		id: `${kmsg.session_id || ''}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-		timestamp: kmsg.timestamp || nowIso,
-		level,
-		source: 'kafka-consumer',
-		message: `${kmsg.method || 'GET'} ${kmsg.endpoint || '/'} -> ${statusCode} ${kmsg.response_time ?? kmsg.responseTime ?? ''}ms`,
-		ip: kmsg.ip,
-		status: statusCode,
-		responseTime: kmsg.response_time ?? kmsg.responseTime,
-		endpoint: kmsg.endpoint,
-		userId: kmsg.user_id || kmsg.userId,
-		sessionId: kmsg.session_id || kmsg.sessionId,
-	};
-}
-
-async function startKafka() {
-	const kafka = new Kafka({ clientId: 'ui-bridge', brokers: KAFKA_BROKERS });
-	const consumer = kafka.consumer({ groupId: KAFKA_GROUP_ID });
-
-	await consumer.connect();
-	await consumer.subscribe({ topic: KAFKA_TOPIC, fromBeginning: false });
-
-	console.log(`✅ Kafka consumer connected. Topic: ${KAFKA_TOPIC}, Brokers: ${KAFKA_BROKERS.join(',')}`);
-
-	await consumer.run({
-		eachMessage: async ({ message, partition, topic }) => {
-			try {
-				const raw = message.value ? message.value.toString('utf8') : '';
-				if (!raw) return;
-				const parsed = JSON.parse(raw);
-				const uiLog = toUiLogEntry(parsed);
-				broadcast(JSON.stringify(uiLog));
-			} catch (err) {
-				console.error('Failed to process Kafka message:', err);
-			}
-		},
-	});
-}
-
-startKafka().catch((err) => {
-	console.error('Kafka startup error:', err);
-	process.exitCode = 1;
+    logger.info(`Ingesting ${data.length} records`);
+    
+    // In a real implementation, you'd write to Iceberg
+    // For now, we'll just log the ingestion
+    res.json({
+      success: true,
+      message: `Ingested ${data.length} records`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Data ingestion error:', error);
+    res.status(500).json({ 
+      error: 'Data ingestion failed', 
+      details: error.message 
+    });
+  }
 });
 
-app.listen(PORT, () => {
-	console.log(`🟢 SSE server listening on http://localhost:${PORT}`);
-	console.log(`➡️  Stream endpoint: http://localhost:${PORT}/events`);
-	console.log(`🗄️  Delta Lake API: http://localhost:${PORT}/api/query`);
+// Server-Sent Events for real-time updates
+app.get('/events', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+
+  // Send initial connection message
+  res.write(`data: ${JSON.stringify({
+    type: 'connection',
+    message: 'Connected to Iceberg Analytics Server',
+    timestamp: new Date().toISOString()
+  })}\n\n`);
+
+  // Send periodic updates
+  const interval = setInterval(() => {
+    res.write(`data: ${JSON.stringify({
+      type: 'heartbeat',
+      timestamp: new Date().toISOString(),
+      activeConnections: 1
+    })}\n\n`);
+  }, 30000);
+
+  req.on('close', () => {
+    clearInterval(interval);
+    logger.info('SSE connection closed');
+  });
 });
+
+// Error handling middleware
+app.use((error, req, res, next) => {
+  logger.error('Unhandled error:', error);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: error.message 
+  });
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  await icebergService.close();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  await icebergService.close();
+  process.exit(0);
+});
+
+// Start server
+app.listen(port, () => {
+  logger.info(`🚀 Iceberg Analytics Server running on port ${port}`);
+  logger.info(`📊 Service: Apache Iceberg + DuckDB`);
+  logger.info(`🔍 Health check: http://localhost:${port}/health`);
+  logger.info(`📝 API docs: http://localhost:${port}/api/tables`);
+});
+
+export default app;

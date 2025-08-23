@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "server": "node server/index.js",
     "setup": "./scripts/setup.sh",
-    "test:delta": "node scripts/test-delta-lake.js",
+    "test:iceberg": "node scripts/test-iceberg.js",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down"
   },
