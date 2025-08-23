@@ -1,289 +1,201 @@
-# 🚀 Iceberg Analytics Platform
+# Iceberg Analytics Platform
 
-Una piattaforma moderna di analytics basata su **Apache Iceberg**, **DuckDB** e **Apache Arrow** per l'analisi di dati in tempo reale con un'interfaccia web React moderna.
+Una piattaforma completa per l'analisi dei dati con Apache Iceberg, DuckDB e React.
 
-## ✨ Caratteristiche Principali
+## 🚀 Avvio Rapido
 
-- **🔍 Query SQL Avanzate**: Esecuzione di query SQL complesse su dati streaming
-- **📊 Analytics in Tempo Reale**: Aggregazioni e metriche live
-- **🌐 Interfaccia Web Moderna**: UI React con Tailwind CSS e Shadcn/ui
-- **📈 Visualizzazioni Interattive**: Grafici e dashboard dinamici
-- **🔄 Streaming Data**: Integrazione Kafka per dati in tempo reale
-- **📁 Formati Multipli**: Supporto per Iceberg, Parquet e Arrow
-- **🚀 Cross-Platform**: Nessuna compilazione nativa richiesta
-
-## 🏗️ Architettura
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   React Frontend│    │  Node.js Server │    │   Apache Kafka  │
-│   (Port 5173)   │◄──►│   (Port 3001)   │◄──►│   (Port 9092)   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │   DuckDB Engine │
-                       │  + Apache Arrow │
-                       │  + Iceberg      │
-                       └─────────────────┘
+### Opzione 1: Avvio Automatico (Raccomandato)
+```bash
+# Avvia sia il backend che il frontend con un comando
+npm run start-project
 ```
 
-## 🛠️ Stack Tecnologico
+### Opzione 2: Avvio Manuale
+```bash
+# Terminal 1: Avvia il backend
+cd server && npm start
 
-### Frontend
-- **React 18** + **TypeScript**
-- **Vite** per build veloce
-- **Tailwind CSS** + **Shadcn/ui**
-- **React Query** per state management
-- **Recharts** per visualizzazioni
+# Terminal 2: Avvia il frontend
+npm run dev
+```
+
+## 📋 Prerequisiti
+
+- **Node.js 18+** (testato su Node 22.16.0)
+- **npm** o **yarn**
+- **WSL2/Linux** (per compatibilità DuckDB)
+
+## 🏗️ Struttura del Progetto
+
+```
+iceberg-analytics/
+├── server/                 # Backend Node.js + DuckDB
+│   ├── index.js           # Server Express principale
+│   ├── icebergService.js  # Servizio Iceberg con DuckDB
+│   ├── start.js           # Script di avvio robusto
+│   └── package.json       # Dipendenze backend
+├── src/                    # Frontend React + TypeScript
+│   ├── components/         # Componenti UI
+│   ├── services/           # Servizi API
+│   └── config/             # Configurazione
+├── start-project.sh        # Script di avvio completo
+└── package.json            # Dipendenze frontend
+```
+
+## 🔧 Installazione
+
+1. **Clona il repository**
+```bash
+git clone <repository-url>
+cd iceberg-analytics
+```
+
+2. **Installa le dipendenze**
+```bash
+# Dipendenze frontend
+npm install
+
+# Dipendenze backend
+cd server && npm install && cd ..
+```
+
+3. **Crea le directory necessarie**
+```bash
+mkdir -p server/logs server/data/iceberg
+```
+
+## 🚀 Avvio dei Servizi
+
+### Backend (Porta 3001)
+```bash
+cd server
+npm start
+```
+
+**Endpoint disponibili:**
+- `GET /health` - Stato del servizio
+- `POST /api/query` - Esecuzione query SQL
+- `GET /api/tables` - Lista tabelle disponibili
+- `GET /api/tables/:name/schema` - Schema tabella
+- `GET /api/tables/:name/data` - Dati tabella
+- `GET /api/tables/:name/stats` - Statistiche tabella
+
+### Frontend (Porta 8080)
+```bash
+npm run dev
+```
+
+**URL:**
+- Frontend: http://localhost:8080
+- Backend: http://localhost:3001
+- Health Check: http://localhost:3001/health
+
+## 🐛 Risoluzione Problemi
+
+### Il server si termina subito
+1. **Controlla i log**: `server/logs/server.log`
+2. **Verifica le dipendenze**: `cd server && npm install`
+3. **Controlla la versione Node.js**: `node --version` (deve essere 18+)
+
+### Il frontend non si connette al backend
+1. **Verifica che il backend sia in esecuzione**: `curl http://localhost:3001/health`
+2. **Controlla la configurazione CORS** nel server
+3. **Verifica le variabili d'ambiente** in `.env.local`
+
+### Errori DuckDB
+1. **Controlla i permessi**: `chmod +x start-project.sh`
+2. **Verifica le directory**: `mkdir -p server/logs server/data/iceberg`
+3. **Riavvia il servizio**: `npm run start-project`
+
+## 📊 Funzionalità
 
 ### Backend
-- **Node.js 18+** con **ES Modules**
-- **Express.js** per API REST
-- **DuckDB** per database embedded
-- **Apache Arrow** per formati dati
-- **Apache Iceberg** per tabelle
-- **Winston** per logging moderno
+- ✅ **DuckDB Integration**: Database in-memory ad alte prestazioni
+- ✅ **Iceberg Tables**: Creazione e gestione tabelle Iceberg
+- ✅ **Sample Data**: Generazione automatica dati di test
+- ✅ **Parquet Export**: Esportazione dati in formato Iceberg
+- ✅ **REST API**: Endpoint completi per l'analisi
+- ✅ **Real-time Events**: Server-Sent Events per aggiornamenti live
 
-### Data Processing
-- **Kafka** per streaming
-- **Parquet** per storage efficiente
-- **Arrow** per formati ottimizzati
+### Frontend
+- ✅ **React 18**: Interfaccia moderna e reattiva
+- ✅ **TypeScript**: Tipizzazione completa
+- ✅ **Shadcn/ui**: Componenti UI professionali
+- ✅ **Real-time Updates**: Aggiornamenti live dal backend
+- ✅ **Responsive Design**: Ottimizzato per tutti i dispositivi
 
-## 🚀 Installazione Rapida
+## 🔍 Monitoraggio
 
-### Prerequisiti
-- **Node.js 18+** (LTS raccomandato)
-- **npm** o **yarn**
-- **Git**
+### Log del Backend
+- **Console**: Output colorato e strutturato
+- **File**: `server/logs/server.log` (formato JSON)
+- **Livelli**: info, warn, error
 
-### Setup Automatico
+### Stato del Servizio
+- **Health Check**: http://localhost:3001/health
+- **Frontend Status**: Componente BackendStatus nella dashboard
+- **Real-time Events**: SSE per monitoraggio continuo
+
+## 🚀 Deployment
+
+### Sviluppo
 ```bash
-# 1. Clona il repository
-git clone <repository-url>
-cd iceberg-analytics-platform
-
-# 2. Esegui lo script di setup
-chmod +x scripts/setup.sh
-./scripts/setup.sh
-
-# 3. Avvia il server
-npm run server
-
-# 4. In un nuovo terminale, avvia il frontend
-npm run dev
-
-# 5. Apri http://localhost:5173
+npm run start-project
 ```
 
-### Setup Manuale
+### Produzione
 ```bash
-# 1. Installa le dipendenze frontend
-npm install
-
-# 2. Installa le dipendenze server
-cd server
-npm install
-cd ..
-
-# 3. Crea le directory necessarie
-mkdir -p data/iceberg data/arrow logs
-
-# 4. Avvia i servizi
-npm run server    # Terminal 1
-npm run dev       # Terminal 2
-```
-
-## 🧪 Testing
-
-```bash
-# Test completo del server
-npm run test:iceberg
-
-# Test specifici
-curl http://localhost:3001/health
-curl http://localhost:3001/api/tables
-```
-
-## 📊 API Endpoints
-
-### Core API
-- `GET /health` - Health check del server
-- `GET /api/tables` - Lista delle tabelle disponibili
-- `GET /api/tables/:name/schema` - Schema di una tabella
-- `GET /api/tables/:name/data` - Dati di una tabella
-- `GET /api/tables/:name/stats` - Statistiche di una tabella
-
-### Query Execution
-- `POST /api/query` - Esegue query SQL
-- `POST /api/ingest` - Ingestione di nuovi dati
-
-### Real-time
-- `GET /events` - Server-Sent Events per aggiornamenti live
-
-## 🐳 Docker Deployment
-
-```bash
-# Avvia tutti i servizi
-docker-compose up -d
-
-# Verifica lo stato
-docker-compose ps
-
-# Logs
-docker-compose logs -f backend
-
-# Ferma i servizi
-docker-compose down
-```
-
-## 🔧 Configurazione
-
-### Variabili d'Ambiente
-```bash
-# Server
-PORT=3001
-NODE_ENV=production
-
-# Iceberg
-ICEBERG_TABLE_PATH=./data/iceberg
-ARROW_DATA_PATH=./data/arrow
-
-# Kafka (opzionale)
-KAFKA_BROKERS=localhost:9092
-KAFKA_TOPIC=web-logs
-KAFKA_GROUP_ID=ui-bridge-group
-```
-
-### File di Configurazione
-- `.env` - Variabili d'ambiente
-- `server/package.json` - Dipendenze server
-- `package.json` - Dipendenze frontend
-- `docker-compose.yml` - Orchestrazione Docker
-
-## 📈 Esempi di Query
-
-### Analisi degli Errori
-```sql
-SELECT endpoint, COUNT(*) as error_count, AVG(response_time) as avg_response_time
-FROM logs 
-WHERE status >= 400 
-  AND timestamp >= current_timestamp() - INTERVAL 24 HOURS
-GROUP BY endpoint
-ORDER BY error_count DESC
-```
-
-### Metriche di Performance
-```sql
-SELECT source, COUNT(*) as total_requests, AVG(response_time) as avg_response_time
-FROM logs
-WHERE timestamp >= current_timestamp() - INTERVAL 1 DAY
-GROUP BY source
-ORDER BY total_requests DESC
-```
-
-### Analisi delle Sessioni
-```sql
-SELECT user_id, COUNT(DISTINCT session_id) as unique_sessions, COUNT(*) as total_requests
-FROM logs
-WHERE timestamp >= current_date()
-GROUP BY user_id
-HAVING total_requests > 10
-ORDER BY total_requests DESC
-```
-
-## 🔍 Troubleshooting
-
-### Problemi Comuni
-
-#### Server non si avvia
-```bash
-# Verifica la porta
-lsof -i :3001
-
-# Controlla i log
-tail -f logs/server.log
-```
-
-#### Dipendenze non installate
-```bash
-# Rimuovi node_modules e reinstalla
-rm -rf node_modules package-lock.json
-npm install
-```
-
-#### Problemi di permessi
-```bash
-# Verifica i permessi delle directory
-ls -la data/ logs/
-chmod -R 755 data/ logs/
-```
-
-### Log e Debug
-- **Server logs**: `logs/server.log`
-- **Iceberg logs**: `logs/iceberg-service.log`
-- **Arrow logs**: `logs/arrow-service.log`
-
-## 🚀 Sviluppo
-
-### Struttura del Progetto
-```
-├── src/                    # Frontend React
-├── server/                 # Backend Node.js
-│   ├── index.js           # Server principale
-│   ├── icebergService.js  # Servizio Iceberg
-│   └── arrowService.js    # Servizio Arrow
-├── scripts/                # Script di setup e utility
-├── data/                   # Dati e tabelle
-│   ├── iceberg/           # Tabelle Iceberg
-│   └── arrow/             # File Arrow/Parquet
-└── logs/                   # File di log
-```
-
-### Comandi di Sviluppo
-```bash
-# Sviluppo frontend
-npm run dev
-
-# Sviluppo backend con hot reload
-cd server && npm run dev
-
-# Build di produzione
+# Build frontend
 npm run build
 
-# Linting
-npm run lint
-
-# Testing
-npm run test:iceberg
+# Avvia backend
+cd server && npm start
 ```
 
-## 📚 Risorse Aggiuntive
+### Docker
+```bash
+docker-compose up -d
+```
 
-- [Apache Iceberg Documentation](https://iceberg.apache.org/)
-- [DuckDB Documentation](https://duckdb.org/docs/)
-- [Apache Arrow Documentation](https://arrow.apache.org/)
-- [React Documentation](https://react.dev/)
-- [Tailwind CSS](https://tailwindcss.com/)
+## 📚 Documentazione API
+
+### Query SQL
+```bash
+curl -X POST http://localhost:3001/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT COUNT(*) as count FROM logs"}'
+```
+
+### Statistiche Tabella
+```bash
+curl http://localhost:3001/api/tables/logs/stats
+```
+
+### Dati Tabella
+```bash
+curl "http://localhost:3001/api/tables/logs/data?limit=10"
+```
 
 ## 🤝 Contributi
 
-1. Fork del repository
-2. Crea un branch per la feature (`git checkout -b feature/AmazingFeature`)
-3. Commit delle modifiche (`git commit -m 'Add some AmazingFeature'`)
-4. Push al branch (`git push origin feature/AmazingFeature`)
-5. Apri una Pull Request
+1. Fork il repository
+2. Crea un branch per la feature: `git checkout -b feature/nuova-funzionalita`
+3. Commit le modifiche: `git commit -am 'Aggiungi nuova funzionalità'`
+4. Push al branch: `git push origin feature/nuova-funzionalita`
+5. Crea una Pull Request
 
 ## 📄 Licenza
 
-Questo progetto è rilasciato sotto licenza MIT. Vedi `LICENSE` per i dettagli.
+Questo progetto è rilasciato sotto licenza MIT.
 
 ## 🆘 Supporto
 
-- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
-- **Documentazione**: [Wiki](https://github.com/your-repo/wiki)
-- **Email**: support@your-domain.com
+Per problemi e domande:
+1. Controlla i log in `server/logs/`
+2. Verifica la documentazione API
+3. Controlla lo stato del servizio nel frontend
+4. Apri una issue su GitHub
 
 ---
 
-**⭐ Se questo progetto ti è utile, considera di dargli una stella su GitHub!**
+**🎉 Pronto per l'analisi dei dati!**

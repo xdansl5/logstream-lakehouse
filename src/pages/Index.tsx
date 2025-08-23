@@ -4,6 +4,7 @@ import LogStream from "@/components/LogStream";
 import AnalyticsChart from "@/components/AnalyticsChart";
 import SqlQuery from "@/components/SqlQuery";
 import DeltaLakeExplorer from "@/components/DeltaLakeExplorer";
+import BackendStatus from "@/components/BackendStatus";
 
 const Index = () => {
   return (
@@ -11,6 +12,15 @@ const Index = () => {
       <Header />
       
       <main className="container mx-auto px-6 py-8 space-y-8">
+        {/* Backend Status */}
+        <section>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-foreground">Backend Status</h2>
+            <p className="text-muted-foreground">Monitor the Iceberg Analytics Server connection</p>
+          </div>
+          <BackendStatus />
+        </section>
+
         {/* Metrics Overview */}
         <section>
           <div className="mb-6">

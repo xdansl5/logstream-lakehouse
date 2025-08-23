@@ -6,6 +6,19 @@ import cors from 'cors';
 import { Kafka } from 'kafkajs';
 import IcebergService from './icebergService.js';
 import winston from 'winston';
+import { existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Ensure logs directory exists
+const logsDir = join(__dirname, 'logs');
+if (!existsSync(logsDir)) {
+  mkdirSync(logsDir, { recursive: true });
+}
 
 // Configure modern logging
 const logger = winston.createLogger({
@@ -22,7 +35,7 @@ const logger = winston.createLogger({
         winston.format.simple()
       )
     }),
-    new winston.transports.File({ filename: 'logs/server.log' })
+    new winston.transports.File({ filename: join(logsDir, 'server.log') })
   ]
 });
 
@@ -30,17 +43,44 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 // Initialize Iceberg service
-const icebergService = new IcebergService();
+let icebergService = null;
 
 // Initialize the service
-logger.info('Starting Iceberg service initialization...');
-icebergService.initialize()
-  .then(() => {
+async function initializeIcebergService() {
+  try {
+    logger.info('Starting Iceberg service initialization...');
+    icebergService = new IcebergService();
+    await icebergService.initialize();
     logger.info('Iceberg service initialized successfully');
-  })
-  .catch(err => {
+    
+    // Keep the service alive by setting up a periodic health check
+    setInterval(async () => {
+      try {
+        if (icebergService && icebergService.initialized) {
+          // Perform a simple query to keep the connection alive
+          await icebergService.executeQuery('SELECT 1 as health_check');
+          logger.debug('Iceberg service health check passed');
+        }
+      } catch (error) {
+        logger.warn('Iceberg service health check failed:', error.message);
+        // Don't crash the server, just log the warning
+      }
+    }, 30000); // Check every 30 seconds
+    
+    return true;
+  } catch (err) {
     logger.error('Failed to initialize Iceberg service:', err);
-  });
+    // Don't crash the server, just log the error and continue without Iceberg
+    icebergService = null;
+    return false;
+  }
+}
+
+// Initialize service on startup - don't wait for it
+initializeIcebergService().catch(err => {
+  logger.error('Iceberg service initialization failed completely:', err);
+  icebergService = null;
+});
 
 // Middleware
 app.use(cors());
@@ -52,13 +92,21 @@ app.get('/health', (req, res) => {
     status: 'healthy', 
     service: 'iceberg-analytics-server',
     timestamp: new Date().toISOString(),
-    version: '2.0.0'
+    version: '2.0.0',
+    icebergService: icebergService ? 'initialized' : 'not available'
   });
 });
 
 // Query execution endpoint
 app.post('/api/query', async (req, res) => {
   try {
+    if (!icebergService) {
+      return res.status(503).json({ 
+        error: 'Iceberg service not available',
+        message: 'Service is still initializing or failed to initialize'
+      });
+    }
+
     const { query } = req.body;
     
     if (!query) {
@@ -87,6 +135,13 @@ app.post('/api/query', async (req, res) => {
 // Get table schema
 app.get('/api/tables/:name/schema', async (req, res) => {
   try {
+    if (!icebergService) {
+      return res.status(503).json({ 
+        error: 'Iceberg service not available',
+        message: 'Service is still initializing or failed to initialize'
+      });
+    }
+
     const { name } = req.params;
     const schema = await icebergService.getTableSchema(name);
     
@@ -107,6 +162,13 @@ app.get('/api/tables/:name/schema', async (req, res) => {
 // Get table data
 app.get('/api/tables/:name/data', async (req, res) => {
   try {
+    if (!icebergService) {
+      return res.status(503).json({ 
+        error: 'Iceberg service not available',
+        message: 'Service is still initializing or failed to initialize'
+      });
+    }
+
     const { name } = req.params;
     const { limit = 100 } = req.query;
     const data = await icebergService.getTableData(name, parseInt(limit));
@@ -129,6 +191,13 @@ app.get('/api/tables/:name/data', async (req, res) => {
 // Get table statistics
 app.get('/api/tables/:name/stats', async (req, res) => {
   try {
+    if (!icebergService) {
+      return res.status(503).json({ 
+        error: 'Iceberg service not available',
+        message: 'Service is still initializing or failed to initialize'
+      });
+    }
+
     const { name } = req.params;
     const stats = await icebergService.getTableStats(name);
     
@@ -157,8 +226,9 @@ app.get('/api/tables', async (req, res) => {
         {
           name: 'logs',
           type: 'iceberg',
-          recordCount: 10000,
-          lastUpdated: new Date().toISOString()
+          recordCount: icebergService ? 10000 : 'unknown',
+          lastUpdated: new Date().toISOString(),
+          status: icebergService ? 'available' : 'initializing'
         }
       ]
     });
@@ -240,13 +310,17 @@ app.use((error, req, res, next) => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  await icebergService.close();
+  if (icebergService) {
+    await icebergService.close();
+  }
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
-  await icebergService.close();
+  if (icebergService) {
+    await icebergService.close();
+  }
   process.exit(0);
 });
 
@@ -256,6 +330,7 @@ app.listen(port, () => {
   logger.info(`📊 Service: Apache Iceberg + DuckDB`);
   logger.info(`🔍 Health check: http://localhost:${port}/health`);
   logger.info(`📝 API docs: http://localhost:${port}/api/tables`);
+  logger.info(`🌐 CORS enabled for cross-origin requests`);
 });
 
 export default app;
