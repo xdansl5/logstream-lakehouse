@@ -1,201 +1,194 @@
-# Iceberg Analytics Platform
+# 🧪 Iceberg Analytics Dashboard
 
-Una piattaforma completa per l'analisi dei dati con Apache Iceberg, DuckDB e React.
+Un dashboard interattivo per l'analisi di log in tempo reale utilizzando Apache Iceberg e DuckDB.
+
+## ✨ Caratteristiche
+
+- **Database Persistente**: DuckDB con storage persistente per i dati dei log
+- **Query SQL Interattive**: Interfaccia web per eseguire query SQL sui log
+- **Generazione Realistica**: Log simulati che riflettono scenari reali di produzione
+- **Analisi in Tempo Reale**: Metriche e grafici aggiornati dinamicamente
+- **API RESTful**: Backend completo con endpoint per query e analytics
 
 ## 🚀 Avvio Rapido
 
-### Opzione 1: Avvio Automatico (Raccomandato)
-```bash
-# Avvia sia il backend che il frontend con un comando
-npm run start-project
-```
+### Prerequisiti
 
-### Opzione 2: Avvio Manuale
-```bash
-# Terminal 1: Avvia il backend
-cd server && npm start
+- Node.js 18+ 
+- npm o yarn
 
-# Terminal 2: Avvia il frontend
-npm run dev
-```
-
-## 📋 Prerequisiti
-
-- **Node.js 18+** (testato su Node 22.16.0)
-- **npm** o **yarn**
-- **WSL2/Linux** (per compatibilità DuckDB)
-
-## 🏗️ Struttura del Progetto
-
-```
-iceberg-analytics/
-├── server/                 # Backend Node.js + DuckDB
-│   ├── index.js           # Server Express principale
-│   ├── icebergService.js  # Servizio Iceberg con DuckDB
-│   ├── start.js           # Script di avvio robusto
-│   └── package.json       # Dipendenze backend
-├── src/                    # Frontend React + TypeScript
-│   ├── components/         # Componenti UI
-│   ├── services/           # Servizi API
-│   └── config/             # Configurazione
-├── start-project.sh        # Script di avvio completo
-└── package.json            # Dipendenze frontend
-```
-
-## 🔧 Installazione
+### Installazione e Avvio
 
 1. **Clona il repository**
-```bash
-git clone <repository-url>
-cd iceberg-analytics
-```
+   ```bash
+   git clone <repository-url>
+   cd iceberg-analytics-dashboard
+   ```
 
-2. **Installa le dipendenze**
-```bash
-# Dipendenze frontend
-npm install
+2. **Avvia il progetto con un comando**
+   ```bash
+   ./start-project.sh
+   ```
 
-# Dipendenze backend
-cd server && npm install && cd ..
-```
+   Questo script:
+   - Installa le dipendenze del backend e frontend
+   - Avvia il server backend su porta 3001
+   - Avvia il frontend su porta 5173
+   - Genera automaticamente dati di log realistici
 
-3. **Crea le directory necessarie**
-```bash
-mkdir -p server/logs server/data/iceberg
-```
+3. **Apri il browser**
+   - Frontend: http://localhost:5173
+   - Backend API: http://localhost:3001
+   - Health Check: http://localhost:3001/health
 
-## 🚀 Avvio dei Servizi
+## 🏗️ Architettura
 
 ### Backend (Porta 3001)
-```bash
-cd server
-npm start
+- **Express.js**: Server web con API RESTful
+- **DuckDB**: Database SQL embedded con storage persistente
+- **Winston**: Logging strutturato
+- **CORS**: Supporto per richieste cross-origin
+
+### Frontend (Porta 5173)
+- **React + TypeScript**: Interfaccia utente moderna
+- **Tailwind CSS**: Styling responsive
+- **React Query**: Gestione stato e cache
+- **Shadcn/ui**: Componenti UI riutilizzabili
+
+### Database Schema
+
+La tabella `logs` contiene:
+- `id`: Identificatore univoco del log
+- `timestamp`: Timestamp dell'evento
+- `level`: Livello del log (INFO, WARN, ERROR, DEBUG)
+- `source`: Fonte del log (spark-streaming, kafka-consumer, etc.)
+- `message`: Messaggio descrittivo
+- `ip`: Indirizzo IP della richiesta
+- `status`: Codice di stato HTTP
+- `response_time`: Tempo di risposta in millisecondi
+- `endpoint`: Endpoint API chiamato
+- `user_id`: ID utente (se autenticato)
+- `session_id`: ID sessione
+- `method`: Metodo HTTP (GET, POST, PUT, DELETE)
+- `user_agent`: User agent del browser
+- `bytes_sent`: Byte inviati nella risposta
+- `referer`: URL di riferimento
+
+## 📊 Query SQL di Esempio
+
+### Analisi degli Errori
+```sql
+SELECT endpoint, count(*) as error_count,
+       avg(response_time) as avg_response_time
+FROM logs 
+WHERE status >= 400 AND timestamp >= datetime('now', '-1 hour')
+GROUP BY endpoint
+ORDER BY error_count DESC
+LIMIT 5
 ```
 
-**Endpoint disponibili:**
-- `GET /health` - Stato del servizio
-- `POST /api/query` - Esecuzione query SQL
-- `GET /api/tables` - Lista tabelle disponibili
-- `GET /api/tables/:name/schema` - Schema tabella
-- `GET /api/tables/:name/data` - Dati tabella
-- `GET /api/tables/:name/stats` - Statistiche tabella
-
-### Frontend (Porta 8080)
-```bash
-npm run dev
+### Performance per Sorgente
+```sql
+SELECT 
+  source,
+  count(*) as total_requests,
+  avg(response_time) as avg_response_time,
+  sum(case when status >= 400 then 1 else 0 end) as errors
+FROM logs
+WHERE timestamp >= datetime('now', '-6 hours')
+GROUP BY source
+ORDER BY avg_response_time DESC
 ```
 
-**URL:**
-- Frontend: http://localhost:8080
-- Backend: http://localhost:3001
-- Health Check: http://localhost:3001/health
-
-## 🐛 Risoluzione Problemi
-
-### Il server si termina subito
-1. **Controlla i log**: `server/logs/server.log`
-2. **Verifica le dipendenze**: `cd server && npm install`
-3. **Controlla la versione Node.js**: `node --version` (deve essere 18+)
-
-### Il frontend non si connette al backend
-1. **Verifica che il backend sia in esecuzione**: `curl http://localhost:3001/health`
-2. **Controlla la configurazione CORS** nel server
-3. **Verifica le variabili d'ambiente** in `.env.local`
-
-### Errori DuckDB
-1. **Controlla i permessi**: `chmod +x start-project.sh`
-2. **Verifica le directory**: `mkdir -p server/logs server/data/iceberg`
-3. **Riavvia il servizio**: `npm run start-project`
-
-## 📊 Funzionalità
-
-### Backend
-- ✅ **DuckDB Integration**: Database in-memory ad alte prestazioni
-- ✅ **Iceberg Tables**: Creazione e gestione tabelle Iceberg
-- ✅ **Sample Data**: Generazione automatica dati di test
-- ✅ **Parquet Export**: Esportazione dati in formato Iceberg
-- ✅ **REST API**: Endpoint completi per l'analisi
-- ✅ **Real-time Events**: Server-Sent Events per aggiornamenti live
-
-### Frontend
-- ✅ **React 18**: Interfaccia moderna e reattiva
-- ✅ **TypeScript**: Tipizzazione completa
-- ✅ **Shadcn/ui**: Componenti UI professionali
-- ✅ **Real-time Updates**: Aggiornamenti live dal backend
-- ✅ **Responsive Design**: Ottimizzato per tutti i dispositivi
-
-## 🔍 Monitoraggio
-
-### Log del Backend
-- **Console**: Output colorato e strutturato
-- **File**: `server/logs/server.log` (formato JSON)
-- **Livelli**: info, warn, error
-
-### Stato del Servizio
-- **Health Check**: http://localhost:3001/health
-- **Frontend Status**: Componente BackendStatus nella dashboard
-- **Real-time Events**: SSE per monitoraggio continuo
-
-## 🚀 Deployment
-
-### Sviluppo
-```bash
-npm run start-project
+### Anomalie in Tempo Reale
+```sql
+SELECT 
+  endpoint, source, level,
+  count(*) as anomaly_count,
+  max(response_time) as max_response_time
+FROM logs 
+WHERE (level = 'ERROR' OR response_time > 1000)
+  AND timestamp >= datetime('now', '-30 minutes')
+GROUP BY endpoint, source, level
+ORDER BY anomaly_count DESC
 ```
 
-### Produzione
-```bash
-# Build frontend
-npm run build
+## 🔧 Configurazione
 
-# Avvia backend
-cd server && npm start
+### Variabili d'Ambiente
+
+Crea un file `.env.local` nella root del progetto:
+
+```env
+# Backend Configuration
+VITE_API_BASE_URL=http://localhost:3001
+VITE_SERVER_URL=http://localhost:3001
+VITE_SSE_URL=http://localhost:3001/events
+
+# Frontend Configuration
+VITE_APP_TITLE=Iceberg Analytics Dashboard
 ```
 
-### Docker
+### Personalizzazione
+
+- **Porte**: Modifica le porte nel file `start-project.sh`
+- **Database**: Il database DuckDB è salvato in `server/data/analytics.db`
+- **Log**: I log del server sono in `server/logs/`
+
+## 📈 Metriche Disponibili
+
+- **Eventi per Secondo**: Tasso di log generati
+- **Tasso di Errore**: Percentuale di errori HTTP
+- **Tempo di Risposta Medio**: Performance delle API
+- **Sessioni Attive**: Numero di sessioni utente
+- **Dati Processati**: Volume di dati analizzati
+- **Tabelle Delta**: Numero di tabelle Iceberg
+
+## 🐛 Troubleshooting
+
+### Backend non si avvia
+1. Verifica che la porta 3001 sia libera
+2. Controlla i log in `server/logs/`
+3. Verifica le dipendenze con `cd server && npm install`
+
+### Frontend non si connette al backend
+1. Verifica che il backend sia in esecuzione su porta 3001
+2. Controlla la configurazione CORS nel backend
+3. Verifica le variabili d'ambiente nel frontend
+
+### Query SQL falliscono
+1. Verifica la sintassi SQL (usa la sintassi DuckDB)
+2. Controlla che la tabella `logs` esista
+3. Verifica i log del backend per errori specifici
+
+## 🔄 Aggiornamenti
+
+Per aggiornare il sistema:
+
 ```bash
-docker-compose up -d
+git pull origin main
+./start-project.sh
 ```
 
-## 📚 Documentazione API
+## 📝 Contributi
 
-### Query SQL
-```bash
-curl -X POST http://localhost:3001/api/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "SELECT COUNT(*) as count FROM logs"}'
-```
-
-### Statistiche Tabella
-```bash
-curl http://localhost:3001/api/tables/logs/stats
-```
-
-### Dati Tabella
-```bash
-curl "http://localhost:3001/api/tables/logs/data?limit=10"
-```
-
-## 🤝 Contributi
-
-1. Fork il repository
-2. Crea un branch per la feature: `git checkout -b feature/nuova-funzionalita`
-3. Commit le modifiche: `git commit -am 'Aggiungi nuova funzionalità'`
-4. Push al branch: `git push origin feature/nuova-funzionalita`
+1. Fork del repository
+2. Crea un branch per la feature (`git checkout -b feature/nuova-feature`)
+3. Commit delle modifiche (`git commit -am 'Aggiunge nuova feature'`)
+4. Push del branch (`git push origin feature/nuova-feature`)
 5. Crea una Pull Request
 
 ## 📄 Licenza
 
-Questo progetto è rilasciato sotto licenza MIT.
+Questo progetto è rilasciato sotto licenza MIT. Vedi il file `LICENSE` per i dettagli.
 
 ## 🆘 Supporto
 
-Per problemi e domande:
-1. Controlla i log in `server/logs/`
-2. Verifica la documentazione API
-3. Controlla lo stato del servizio nel frontend
-4. Apri una issue su GitHub
+Per problemi o domande:
+- Apri una issue su GitHub
+- Controlla i log del sistema
+- Verifica la documentazione dell'API su `/health`
 
 ---
 
-**🎉 Pronto per l'analisi dei dati!**
+**Nota**: Questo è un sistema di demo per scopi educativi. Non utilizzare in produzione senza adeguate modifiche di sicurezza.

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,13 +14,13 @@ const SqlQuery = () => {
   
   const [query, setQuery] = useState(
     `SELECT 
-  date_format(timestamp, 'yyyy-MM-dd HH:mm') as hour,
+  strftime('%Y-%m-%d %H:%M', timestamp) as hour,
   count(*) as total_requests,
   sum(case when status >= 400 then 1 else 0 end) as errors,
   avg(response_time) as avg_response_time
-FROM delta_lake.logs 
-WHERE timestamp >= current_timestamp() - interval 1 day
-GROUP BY date_format(timestamp, 'yyyy-MM-dd HH:mm')
+FROM logs 
+WHERE timestamp >= datetime('now', '-1 day')
+GROUP BY strftime('%Y-%m-%d %H:%M', timestamp)
 ORDER BY hour DESC
 LIMIT 10`
   );
@@ -61,7 +61,7 @@ LIMIT 10`
       
       toast({
         title: "Query Executed Successfully",
-        description: `Found ${queryResults.length} rows in ${time}`,
+        description: `Found ${queryResults.length} rows in ${time}ms`,
       });
     } catch (error) {
       toast({
@@ -79,8 +79,8 @@ LIMIT 10`
       name: "Top Error Endpoints",
       query: `SELECT endpoint, count(*) as error_count,
        avg(response_time) as avg_response_time
-FROM delta_lake.logs 
-WHERE status >= 400 AND timestamp >= current_timestamp() - interval 1 hour
+FROM logs 
+WHERE status >= 400 AND timestamp >= datetime('now', '-1 hour')
 GROUP BY endpoint
 ORDER BY error_count DESC
 LIMIT 5`
@@ -91,9 +91,9 @@ LIMIT 5`
   user_id,
   count(distinct session_id) as sessions,
   count(*) as page_views,
-  sum(response_time) / count(*) as avg_session_time
-FROM delta_lake.logs
-WHERE timestamp >= current_date()
+  avg(response_time) as avg_response_time
+FROM logs
+WHERE timestamp >= datetime('now', '-1 day')
 GROUP BY user_id
 ORDER BY page_views DESC
 LIMIT 10`
@@ -104,11 +104,23 @@ LIMIT 10`
   endpoint, source, level,
   count(*) as anomaly_count,
   max(response_time) as max_response_time
-FROM delta_lake.logs 
+FROM logs 
 WHERE (level = 'ERROR' OR response_time > 1000)
-  AND timestamp >= current_timestamp() - interval 30 minutes
+  AND timestamp >= datetime('now', '-30 minutes')
 GROUP BY endpoint, source, level
 ORDER BY anomaly_count DESC`
+    },
+    {
+      name: "Source Performance",
+      query: `SELECT 
+  source,
+  count(*) as total_requests,
+  avg(response_time) as avg_response_time,
+  sum(case when status >= 400 then 1 else 0 end) as errors
+FROM logs
+WHERE timestamp >= datetime('now', '-6 hours')
+GROUP BY source
+ORDER BY avg_response_time DESC`
     }
   ];
 

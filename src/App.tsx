@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DataProvider } from "./contexts/DataContext";
 import BackendStatus from "./components/BackendStatus";
+import SqlQuery from "./components/SqlQuery";
 
 const queryClient = new QueryClient();
 
@@ -19,7 +20,7 @@ const App = () => (
             <main className="container mx-auto px-6 py-8 space-y-8">
               <div className="mb-6">
                 <h1 className="text-3xl font-bold text-foreground">🧪 Iceberg Analytics Test</h1>
-                <p className="text-muted-foreground">Test di connessione al backend</p>
+                <p className="text-muted-foreground">Test di connessione al backend e query interattive</p>
               </div>
               
               {/* Backend Status */}
@@ -29,6 +30,15 @@ const App = () => (
                   <p className="text-muted-foreground">Monitora la connessione al server Iceberg</p>
                 </div>
                 <BackendStatus />
+              </section>
+
+              {/* SQL Query Interface */}
+              <section>
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-foreground">SQL Query Interface</h2>
+                  <p className="text-muted-foreground">Esegui query SQL interattive sul database dei log</p>
+                </div>
+                <SqlQuery />
               </section>
             </main>
           </div>
