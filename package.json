@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node server/index.js",
+    "start-project": "./start-project.sh",
     "setup": "./scripts/setup.sh",
     "test:iceberg": "node scripts/test-iceberg.js",
     "docker:up": "docker-compose up -d",
