@@ -178,20 +178,37 @@ class PipelineOrchestrator:
         # Wait a bit for the processor to start
         time.sleep(10)
         
-        # Start ML streaming processor
-        logger.info("🤖 Starting ML streaming processor...")
-        elasticsearch_host = self.config["elasticsearch"]["host"] if self.config["elasticsearch"]["enabled"] else "none"
-        self.processes["ml_processor"] = subprocess.Popen([
-            "python3", "ml_streaming_processor.py",
-            "--mode", "stream",
-            "--kafka-servers", self.config["kafka"]["servers"],
-            "--topic", self.config["kafka"]["topic"],
-            "--output-path", self.config["delta_lake"]["ml_enriched_path"],
-            "--checkpoint-path", self.config["checkpoints"]["ml_logs"],
-            "--elasticsearch-host", elasticsearch_host
-        ], cwd="scripts")
+        # Try to start ML streaming processor, fallback to simple processor if ML fails
+        logger.info("🤖 Attempting to start ML streaming processor...")
+        try:
+            elasticsearch_host = self.config["elasticsearch"]["host"] if self.config["elasticsearch"]["enabled"] else "none"
+            self.processes["ml_processor"] = subprocess.Popen([
+                "python3", "ml_streaming_processor.py",
+                "--mode", "stream",
+                "--kafka-servers", self.config["kafka"]["servers"],
+                "--topic", self.config["kafka"]["topic"],
+                "--output-path", self.config["delta_lake"]["ml_enriched_path"],
+                "--checkpoint-path", self.config["checkpoints"]["ml_logs"],
+                "--elasticsearch-host", elasticsearch_host
+            ], cwd="scripts")
+            logger.info("✅ ML streaming processor started successfully")
+        except Exception as e:
+            logger.warning(f"⚠️ ML streaming processor failed to start: {e}")
+            logger.info("🔄 Falling back to simple streaming processor...")
+            
+            # Use simple streaming processor as fallback
+            self.processes["simple_processor"] = subprocess.Popen([
+                "python3", "simple_streaming_processor.py",
+                "--mode", "stream",
+                "--kafka-servers", self.config["kafka"]["servers"],
+                "--topic", self.config["kafka"]["topic"],
+                "--output-path", self.config["delta_lake"]["ml_enriched_path"],
+                "--checkpoint-path", self.config["checkpoints"]["ml_logs"],
+                "--elasticsearch-host", elasticsearch_host
+            ], cwd="scripts")
+            logger.info("✅ Simple streaming processor started as fallback")
         
-        # Wait a bit for the ML processor to start
+        # Wait a bit for the processor to start
         time.sleep(10)
         
         # Start anomaly detector
@@ -260,9 +277,32 @@ class PipelineOrchestrator:
                     "--checkpoint-path", self.config["checkpoints"]["logs"]
                 ], cwd="scripts")
             elif process_name == "ml_processor":
+                try:
+                    elasticsearch_host = self.config["elasticsearch"]["host"] if self.config["elasticsearch"]["enabled"] else "none"
+                    self.processes[process_name] = subprocess.Popen([
+                        "python3", "ml_streaming_processor.py",
+                        "--mode", "stream",
+                        "--kafka-servers", self.config["kafka"]["servers"],
+                        "--topic", self.config["kafka"]["topic"],
+                        "--output-path", self.config["delta_lake"]["ml_enriched_path"],
+                        "--checkpoint-path", self.config["checkpoints"]["ml_logs"],
+                        "--elasticsearch-host", elasticsearch_host
+                    ], cwd="scripts")
+                except Exception as e:
+                    logger.warning(f"⚠️ ML processor restart failed: {e}, using simple processor")
+                    self.processes["simple_processor"] = subprocess.Popen([
+                        "python3", "simple_streaming_processor.py",
+                        "--mode", "stream",
+                        "--kafka-servers", self.config["kafka"]["servers"],
+                        "--topic", self.config["kafka"]["topic"],
+                        "--output-path", self.config["delta_lake"]["ml_enriched_path"],
+                        "--checkpoint-path", self.config["checkpoints"]["ml_logs"],
+                        "--elasticsearch-host", elasticsearch_host
+                    ], cwd="scripts")
+            elif process_name == "simple_processor":
                 elasticsearch_host = self.config["elasticsearch"]["host"] if self.config["elasticsearch"]["enabled"] else "none"
                 self.processes[process_name] = subprocess.Popen([
-                    "python3", "ml_streaming_processor.py",
+                    "python3", "simple_streaming_processor.py",
                     "--mode", "stream",
                     "--kafka-servers", self.config["kafka"]["servers"],
                     "--topic", self.config["kafka"]["topic"],
