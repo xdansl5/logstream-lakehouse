@@ -151,7 +151,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!isStreaming) return;
 
-    const sseUrl = (import.meta as any).env?.VITE_SSE_URL ?? 'http://localhost:4000/events';
+    const sseUrl = (import.meta as any).env?.VITE_SSE_URL ?? 'http://localhost:3001/events';
     let es: EventSource | null = null;
 
     try {
@@ -246,10 +246,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, [logs]);
 
-  // Execute real Delta Lake queries via API
+  // Execute real DuckDB queries via API
   const executeQuery = useCallback(async (query: string): Promise<{ results: QueryResult[]; executionTime: string }> => {
     try {
-      const serverUrl = (import.meta as any).env?.VITE_SERVER_URL ?? 'http://localhost:4000';
+      const serverUrl = (import.meta as any).env?.VITE_SERVER_URL ?? 'http://localhost:3001';
       const response = await fetch(`${serverUrl}/api/query`, {
         method: 'POST',
         headers: {
@@ -265,11 +265,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const data = await response.json();
       return {
-        results: data.results || [],
-        executionTime: data.executionTime || '0s'
+        results: data.data || [],
+        executionTime: data.executionTime || '0ms'
       };
     } catch (error) {
-      console.error('Delta Lake query error:', error);
+      console.error('DuckDB query error:', error);
       throw new Error(`Query execution failed: ${error.message}`);
     }
   }, []);

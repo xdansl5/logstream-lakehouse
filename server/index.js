@@ -65,7 +65,7 @@ async function initializeIcebergService() {
         logger.warn('Iceberg service health check failed:', error.message);
         // Don't crash the server, just log the warning
       }
-    }, 30000); // Check every 30 seconds
+    }, 60000); // Check every 60 seconds instead of 30
     
     return true;
   } catch (err) {
@@ -121,13 +121,15 @@ app.post('/api/query', async (req, res) => {
       data: result.data,
       executionTime: result.executionTime,
       rowCount: result.rowCount,
-      query: result.query
+      query: result.query,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
     logger.error('Query execution error:', error);
     res.status(500).json({ 
       error: 'Query execution failed', 
-      details: error.message 
+      details: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
@@ -218,17 +220,33 @@ app.get('/api/tables/:name/stats', async (req, res) => {
 // List available tables
 app.get('/api/tables', async (req, res) => {
   try {
-    // For now, return the logs table
-    // In a real implementation, you'd scan the Iceberg catalog
+    if (!icebergService) {
+      return res.status(503).json({ 
+        error: 'Iceberg service not available',
+        message: 'Service is still initializing or failed to initialize'
+      });
+    }
+
+    // Get actual table statistics
+    const stats = await icebergService.getTableStats('logs');
+    
     res.json({
       success: true,
       tables: [
         {
           name: 'logs',
-          type: 'iceberg',
-          recordCount: icebergService ? 10000 : 'unknown',
-          lastUpdated: new Date().toISOString(),
-          status: icebergService ? 'available' : 'initializing'
+          type: 'sqlite',
+          recordCount: stats ? stats.total_records : 'unknown',
+          lastUpdated: stats ? stats.latest_record : new Date().toISOString(),
+          status: icebergService ? 'available' : 'initializing',
+          schema: {
+            columns: [
+              'id', 'timestamp', 'level', 'source', 'message', 
+              'ip', 'status', 'response_time', 'endpoint', 
+              'user_id', 'session_id', 'method', 'user_agent', 
+              'bytes_sent', 'referer'
+            ]
+          }
         }
       ]
     });
@@ -307,30 +325,42 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Graceful shutdown
+
+
+// Start server with error handling
+const server = app.listen(port, () => {
+  logger.info(`🚀 Iceberg Analytics Server running on port ${port}`);
+  logger.info(`📊 Service: Apache Iceberg + SQLite`);
+  logger.info(`🔍 Health check: http://localhost:${port}/health`);
+  logger.info(`📝 API docs: http://localhost:${port}/api/tables`);
+  logger.info(`🌐 CORS enabled for cross-origin requests`);
+});
+
+// Handle server errors
+server.on('error', (error) => {
+  logger.error('Server error:', error);
+  process.exit(1);
+});
+
+// Handle process termination
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  if (icebergService) {
-    await icebergService.close();
-  }
-  process.exit(0);
+  server.close(async () => {
+    if (icebergService) {
+      await icebergService.close();
+    }
+    process.exit(0);
+  });
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
-  if (icebergService) {
-    await icebergService.close();
-  }
-  process.exit(0);
-});
-
-// Start server
-app.listen(port, () => {
-  logger.info(`🚀 Iceberg Analytics Server running on port ${port}`);
-  logger.info(`📊 Service: Apache Iceberg + DuckDB`);
-  logger.info(`🔍 Health check: http://localhost:${port}/health`);
-  logger.info(`📝 API docs: http://localhost:${port}/api/tables`);
-  logger.info(`🌐 CORS enabled for cross-origin requests`);
+  server.close(async () => {
+    if (icebergService) {
+      await icebergService.close();
+    }
+    process.exit(0);
+  });
 });
 
 export default app;
