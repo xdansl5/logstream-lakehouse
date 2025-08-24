@@ -14,7 +14,10 @@ class AnomalyDetector:
     def __init__(self, app_name="AnomalyDetector"):
         builder = SparkSession.builder.appName(app_name) \
             .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-            .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+            .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+            .config("spark.sql.streaming.statefulOperator.checkpointing.enabled", "true") \
+            .config("spark.sql.streaming.statefulOperator.checkpointing.interval", "10") \
+            .config("spark.sql.streaming.statefulOperator.checkpointing.timeout", "60")
         
         self.spark = configure_spark_with_delta_pip(builder).getOrCreate()
         self.spark.sparkContext.setLogLevel("WARN")
@@ -30,6 +33,7 @@ class AnomalyDetector:
             .load()
         
         # Calcola metriche in finestre temporali di 1 minuto
+        # Usa approx_count_distinct invece di countDistinct per streaming
         windowed_metrics = logs_stream \
             .withWatermark("timestamp", "2 minutes") \
             .groupBy(
@@ -41,7 +45,7 @@ class AnomalyDetector:
                 count("*").alias("request_count"),
                 avg("response_time").alias("avg_response_time"),
                 sum(when(col("is_error"), 1).otherwise(0)).alias("error_count"),
-                countDistinct("ip").alias("unique_ips")
+                approx_count_distinct("ip", 0.05).alias("unique_ips")  # Fixed: replaced countDistinct
             ) \
             .withColumn("error_rate", col("error_count") / col("request_count"))
         
