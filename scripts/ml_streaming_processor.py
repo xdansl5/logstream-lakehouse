@@ -250,8 +250,33 @@ class MLLogProcessor:
         # Apply ML models if available
         ml_enriched_df = self.apply_ml_models(enriched_df)
         
-        # Add metadata for Elasticsearch
+        # Debug: Log the columns after ML processing
+        logger.info(f"🔍 Columns after ML processing: {ml_enriched_df.columns}")
+        
+        # Ensure all required columns exist for downstream processing
         final_df = ml_enriched_df \
+            .withColumn("is_anomaly", 
+                when(col("is_anomaly").isNotNull(), col("is_anomaly"))
+                .otherwise(lit(False))) \
+            .withColumn("anomaly_score", 
+                when(col("anomaly_score").isNotNull(), col("anomaly_score"))
+                .otherwise(lit(0.1))) \
+            .withColumn("ml_confidence", 
+                when(col("ml_confidence").isNotNull(), col("ml_confidence"))
+                .otherwise(lit("low"))) \
+            .withColumn("anomaly_type", 
+                when(col("anomaly_type").isNotNull(), col("anomaly_type"))
+                .otherwise(lit("NORMAL")))
+        
+        # Debug: Log the columns after ensuring required columns
+        logger.info(f"🔍 Columns after ensuring required columns: {final_df.columns}")
+        
+        # Debug: Show sample data
+        logger.info("🔍 Sample data structure:")
+        final_df.select("timestamp", "ip", "endpoint", "is_anomaly", "anomaly_score", "ml_confidence", "anomaly_type").show(5, truncate=False)
+        
+        # Add metadata for Elasticsearch
+        final_df = final_df \
             .withColumn("_id", 
                 concat(col("timestamp").cast("string"), lit("_"), 
                        col("ip"), lit("_"), col("endpoint"))) \
