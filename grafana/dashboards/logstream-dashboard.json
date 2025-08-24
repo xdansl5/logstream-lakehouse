@@ -1,0 +1,166 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "LogStream Lakehouse Dashboard",
+    "tags": ["logs", "anomaly-detection", "real-time"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Real-Time Log Volume",
+        "type": "stat",
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "sum(rate(log_volume_total[5m]))",
+            "legendFormat": "logs/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 100},
+                {"color": "red", "value": 500}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Anomaly Detection Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "sum(rate(anomalies_detected_total[5m]))",
+            "legendFormat": "anomalies/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 20}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Response Time Distribution",
+        "type": "histogram",
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "histogram_quantile(0.95, sum(rate(response_time_bucket[5m])) by (le))",
+            "legendFormat": "95th percentile"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Log Volume Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "sum(rate(log_volume_total[1m])) by (endpoint)",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Error Rate by Endpoint",
+        "type": "barchart",
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "sum(rate(error_count_total[5m])) by (endpoint) / sum(rate(request_count_total[5m])) by (endpoint)",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "ML Model Confidence",
+        "type": "piechart",
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "sum(rate(ml_predictions_total[5m])) by (confidence_level)",
+            "legendFormat": "{{confidence_level}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "Top Anomalous IPs",
+        "type": "table",
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "topk(10, sum(rate(anomalies_detected_total[5m])) by (ip_address))",
+            "legendFormat": "{{ip_address}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 8,
+        "title": "Pipeline Health Status",
+        "type": "stat",
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "up{job=\"logstream-processor\"}",
+            "legendFormat": "Processor"
+          },
+          {
+            "refId": "B",
+            "expr": "up{job=\"anomaly-detector\"}",
+            "legendFormat": "Anomaly Detector"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s"
+  }
+}
