@@ -4,51 +4,72 @@ ML-Powered Real-Time Log Processing Pipeline
 Integrates Kafka, Spark Structured Streaming, ML models, and Elasticsearch
 """
 
+import argparse
+import json
+import logging
+from datetime import datetime
+
+from delta import *
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
-from pyspark.ml.feature import VectorAssembler, StandardScaler
-from pyspark.ml.clustering import KMeans
-from pyspark.ml.classification import RandomForestClassifier
-from pyspark.ml import Pipeline
-from delta import *
-import json
-import argparse
-from datetime import datetime
-import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Try to import ML libraries with compatibility handling
+try:
+    from pyspark.ml import Pipeline
+    from pyspark.ml.clustering import KMeans
+    from pyspark.ml.classification import RandomForestClassifier
+    from pyspark.ml.feature import VectorAssembler, StandardScaler
+
+    ML_AVAILABLE = True
+    logger.info("✅ PySpark ML libraries loaded successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ PySpark ML libraries not available: {e}")
+    logger.warning("⚠️ ML features will be disabled. Using rule-based anomaly detection instead.")
+    ML_AVAILABLE = False
+
+
 class MLLogProcessor:
+    """Class for ML-powered log processing with Spark, Kafka, and Elasticsearch."""
+
     def __init__(self, app_name="MLLogProcessor"):
         # Enhanced Spark configuration for ML and streaming
-        builder = SparkSession.builder.appName(app_name) \
-            .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-            .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
-            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-            .config("spark.sql.adaptive.enabled", "false") \  # Disable for streaming
-            .config("spark.sql.streaming.statefulOperator.checkpointing.enabled", "true") \
-            .config("spark.sql.streaming.statefulOperator.checkpointing.interval", "10") \
-            .config("spark.sql.streaming.statefulOperator.checkpointing.timeout", "60") \
-            .config("spark.sql.streaming.minBatchesToRetain", "2") \
-            .config("spark.sql.streaming.maxBatchesToRetainInMemory", "10") \
-            .config("spark.memory.offHeap.enabled", "true") \
+        builder = (
+            SparkSession.builder.appName(app_name)
+            .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+            .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+            .config("spark.sql.adaptive.enabled", "false")
+            .config("spark.sql.streaming.statefulOperator.checkpointing.enabled", "true")
+            .config("spark.sql.streaming.statefulOperator.checkpointing.interval", "10")
+            .config("spark.sql.streaming.statefulOperator.checkpointing.timeout", "60")
+            .config("spark.sql.streaming.minBatchesToRetain", "2")
+            .config("spark.sql.streaming.maxBatchesToRetainInMemory", "10")
+            .config("spark.memory.offHeap.enabled", "true")
             .config("spark.memory.offHeap.size", "1g")
-        
+        )
+
         self.spark = configure_spark_with_delta_pip(builder).getOrCreate()
         self.spark.sparkContext.setLogLevel("WARN")
-        
+
         # Initialize ML models
         self.anomaly_model = None
         self.clustering_model = None
         self.classification_model = None
-        
+
         logger.info(f"✅ ML Log Processor initialized with Spark {self.spark.version}")
+        logger.info(f"🤖 ML capabilities: {'Available' if ML_AVAILABLE else 'Disabled'}")
+
+    # ---------------------------------------------------------
+    # SCHEMA & FEATURE ENGINEERING
+    # ---------------------------------------------------------
 
     def define_enhanced_schema(self):
-        """Enhanced schema with additional ML features"""
+        """Enhanced schema with additional ML features."""
         return StructType([
             StructField("timestamp", StringType(), True),
             StructField("ip", StringType(), True),
@@ -61,108 +82,188 @@ class MLLogProcessor:
             StructField("session_id", StringType(), True),
             StructField("bytes_sent", IntegerType(), True),
             StructField("referer", StringType(), True),
-            StructField("request_size", IntegerType(), True),
-            StructField("query_params", StringType(), True)
+            StructField("query_params", StringType(), True),
         ])
 
     def create_ml_features(self, df):
-        """Create ML features from log data"""
-        return df \
-            .withColumn("processed_timestamp", current_timestamp()) \
-            .withColumn("date", to_date(col("timestamp"))) \
-            .withColumn("hour", hour(col("timestamp"))) \
-            .withColumn("minute", minute(col("timestamp"))) \
-            .withColumn("day_of_week", dayofweek(col("timestamp"))) \
-            .withColumn("is_error", col("status_code") >= 400) \
-            .withColumn("is_slow", col("response_time") > 1000) \
-            .withColumn("is_critical_error", col("status_code") >= 500) \
-            .withColumn("ip_class", 
-                when(col("ip").startswith("192.168"), "internal")
-                .when(col("ip").startswith("10."), "internal")
-                .otherwise("external")) \
-            .withColumn("endpoint_category",
-                when(col("endpoint").startswith("/api/"), "api")
-                .when(col("endpoint").startswith("/admin"), "admin")
-                .when(col("endpoint").startswith("/auth"), "auth")
-                .otherwise("web")) \
-            .withColumn("method_category",
-                when(col("method").isin(["GET", "HEAD"]), "read")
-                .when(col("method").isin(["POST", "PUT", "PATCH"]), "write")
-                .when(col("method").isin(["DELETE"]), "delete")
-                .otherwise("other")) \
-            .withColumn("response_time_category",
-                when(col("response_time") < 100, "fast")
-                .when(col("response_time") < 500, "medium")
-                .when(col("response_time") < 1000, "slow")
-                .otherwise("very_slow")) \
-            .withColumn("request_size_category",
-                when(col("request_size") < 1024, "small")
-                .when(col("request_size") < 10240, "medium")
-                .otherwise("large")) \
-            .withColumn("hour_traffic_peak", 
-                when(col("hour").between(9, 17), "business_hours")
-                .when(col("hour").between(18, 22), "evening")
-                .otherwise("off_hours"))
+        """Create ML features from log data."""
+        return (
+            df.withColumn("processed_timestamp", current_timestamp())
+              .withColumn("date", to_date(col("timestamp")))
+              .withColumn("hour", hour(col("timestamp")))
+              .withColumn("minute", minute(col("timestamp")))
+              .withColumn("day_of_week", dayofweek(col("timestamp")))
+              .withColumn("is_error", col("status_code") >= 400)
+              .withColumn("is_slow", col("response_time") > 1000)
+              .withColumn("is_critical_error", col("status_code") >= 500)
+              .withColumn(
+                  "ip_class",
+                  when(col("ip").startswith("192.168"), "internal")
+                  .when(col("ip").startswith("10."), "internal")
+                  .otherwise("external"),
+              )
+              .withColumn(
+                  "endpoint_category",
+                  when(col("endpoint").startswith("/api/"), "api")
+                  .when(col("endpoint").startswith("/admin"), "admin")
+                  .when(col("endpoint").startswith("/auth"), "auth")
+                  .otherwise("web"),
+              )
+              .withColumn(
+                  "method_category",
+                  when(col("method").isin(["GET", "HEAD"]), "read")
+                  .when(col("method").isin(["POST", "PUT", "PATCH"]), "write")
+                  .when(col("method").isin(["DELETE"]), "delete")
+                  .otherwise("other"),
+              )
+              .withColumn(
+                  "response_time_category",
+                  when(col("response_time") < 100, "fast")
+                  .when(col("response_time") < 500, "medium")
+                  .when(col("response_time") < 1000, "slow")
+                  .otherwise("very_slow"),
+              )
+              .withColumn(
+                  "hour_traffic_peak",
+                  when(col("hour").between(9, 17), "business_hours")
+                  .when(col("hour").between(18, 22), "evening")
+                  .otherwise("off_hours"),
+              )
+        )
 
-    def train_anomaly_detection_model(self, training_data_path):
-        """Train anomaly detection model using K-means clustering"""
-        logger.info("🔬 Training anomaly detection model...")
-        
-        # Read training data
-        training_df = self.spark.read.format("delta").load(training_data_path)
-        
-        # Create numerical features for ML
-        feature_cols = ["response_time", "status_code", "bytes_sent", "request_size"]
-        assembler = VectorAssembler(inputCols=feature_cols, outputCol="features")
-        
-        # Standardize features
-        scaler = StandardScaler(inputCol="features", outputCol="scaled_features")
-        
-        # K-means clustering for anomaly detection
-        kmeans = KMeans(k=3, seed=42, featuresCol="scaled_features")
-        
-        # Create pipeline
-        pipeline = Pipeline(stages=[assembler, scaler, kmeans])
-        
-        # Train model
-        self.anomaly_model = pipeline.fit(training_df)
-        logger.info("✅ Anomaly detection model trained successfully")
-        
-        return self.anomaly_model
+    # ---------------------------------------------------------
+    # RULE-BASED DETECTION
+    # ---------------------------------------------------------
 
-    def apply_ml_models(self, df):
-        """Apply trained ML models to streaming data"""
-        if self.anomaly_model is None:
-            logger.warning("⚠️ No ML model available, skipping ML inference")
-            return df
-        
-        # Apply anomaly detection
-        df_with_features = df \
-            .withColumn("features", 
-                array(col("response_time"), col("status_code"), 
-                      col("bytes_sent"), col("request_size")))
-        
-        # Make predictions
-        predictions = self.anomaly_model.transform(df_with_features)
-        
-        # Add anomaly scores and labels
-        enriched_df = predictions \
-            .withColumn("anomaly_score", 
-                when(col("prediction") == 0, 0.1)  # Normal cluster
-                .when(col("prediction") == 1, 0.5)  # Medium risk
-                .otherwise(0.9))  # High risk cluster \
-            .withColumn("is_anomaly", col("anomaly_score") > 0.7) \
-            .withColumn("ml_confidence", 
+    def apply_rule_based_anomaly_detection(self, df):
+        """Apply rule-based anomaly detection when ML is not available."""
+        logger.info("🔍 Applying rule-based anomaly detection...")
+
+        return (
+            df.withColumn(
+                "anomaly_score",
+                when(col("is_critical_error"), 0.9)
+                .when(col("is_slow") & (col("response_time") > 2000), 0.8)
+                .when(col("is_slow"), 0.6)
+                .when(col("is_error"), 0.5)
+                .when(col("response_time") > 500, 0.3)
+                .otherwise(0.1),
+            )
+            .withColumn("is_anomaly", col("anomaly_score") > 0.5)
+            .withColumn(
+                "ml_confidence",
                 when(col("anomaly_score") > 0.8, "high")
                 .when(col("anomaly_score") > 0.5, "medium")
-                .otherwise("low"))
-        
-        return enriched_df
+                .otherwise("low"),
+            )
+            .withColumn(
+                "anomaly_type",
+                when(col("is_critical_error"), "CRITICAL_ERROR")
+                .when(col("is_slow") & (col("response_time") > 2000), "VERY_SLOW_RESPONSE")
+                .when(col("is_slow"), "SLOW_RESPONSE")
+                .when(col("is_error"), "ERROR")
+                .when(col("response_time") > 500, "MEDIUM_RESPONSE")
+                .otherwise("NORMAL"),
+            )
+        )
 
-    def start_ml_streaming(self, kafka_servers="localhost:9092", topic="web-logs", 
-                          output_path="/tmp/delta-lake/ml-enriched-logs",
-                          checkpoint_path="/tmp/checkpoints/ml-logs",
-                          elasticsearch_host="localhost:9200"):
+    # ---------------------------------------------------------
+    # TRAINING & INFERENCE
+    # ---------------------------------------------------------
+
+    def train_anomaly_detection_model(self, training_data_path):
+        """Train anomaly detection model using K-means clustering."""
+        if not ML_AVAILABLE:
+            logger.warning("⚠️ ML libraries not available, skipping model training")
+            return None
+
+        logger.info("🔬 Training anomaly detection model...")
+
+        try:
+            # Read training data
+            training_df = self.spark.read.format("delta").load(training_data_path)
+
+            # Create numerical features for ML
+            feature_cols = ["response_time", "status_code", "bytes_sent"]
+            assembler = VectorAssembler(inputCols=feature_cols, outputCol="features")
+
+            # Standardize features
+            scaler = StandardScaler(inputCol="features", outputCol="scaled_features")
+
+            # K-means clustering for anomaly detection
+            kmeans = KMeans(k=3, seed=42, featuresCol="scaled_features")
+
+            # Create pipeline
+            pipeline = Pipeline(stages=[assembler, scaler, kmeans])
+
+            # Train model
+            self.anomaly_model = pipeline.fit(training_df)
+            logger.info("✅ Anomaly detection model trained successfully")
+
+            return self.anomaly_model
+
+        except Exception as e:
+            logger.error(f"❌ ML model training failed: {e}")
+            logger.info("🔄 Falling back to rule-based detection")
+            return None
+
+    def apply_ml_models(self, df):
+        """Apply trained ML models to streaming data."""
+        if self.anomaly_model is None or not ML_AVAILABLE:
+            logger.info("🔄 Using rule-based anomaly detection")
+            return self.apply_rule_based_anomaly_detection(df)
+
+        try:
+            df_with_features = df.withColumn(
+                "features",
+                array(col("response_time"), col("status_code"), col("bytes_sent")),
+            )
+
+            # Make predictions
+            predictions = self.anomaly_model.transform(df_with_features)
+
+            return (
+                predictions.withColumn(
+                    "anomaly_score",
+                    when(col("prediction") == 0, 0.1)
+                    .when(col("prediction") == 1, 0.5)
+                    .otherwise(0.9),
+                )
+                .withColumn("is_anomaly", col("anomaly_score") > 0.7)
+                .withColumn(
+                    "ml_confidence",
+                    when(col("anomaly_score") > 0.8, "high")
+                    .when(col("anomaly_score") > 0.5, "medium")
+                    .otherwise("low"),
+                )
+                .withColumn(
+                    "anomaly_type",
+                    when(col("prediction") == 0, "NORMAL")
+                    .when(col("prediction") == 1, "MEDIUM_RISK")
+                    .otherwise("HIGH_RISK"),
+                )
+            )
+
+        except Exception as e:
+            logger.error(f"❌ ML inference failed: {e}, falling back to rule-based detection")
+            return self.apply_rule_based_anomaly_detection(df)
+
+    # ---------------------------------------------------------
+    # STREAMING PIPELINE
+    # ---------------------------------------------------------
+
+    def start_ml_streaming(
+        self,
+        kafka_servers="localhost:9092",
+        topic="web-logs",
+        output_path="/tmp/delta-lake/ml-enriched-logs",
+        checkpoint_path="/tmp/checkpoints/ml-logs",
+        elasticsearch_host="localhost:9200",
+    ):
+        """Start ML-powered streaming processing."""
+        logger.info(f"🚀 Starting ML-powered streaming from Kafka topic: {topic}")
+        logger.info(f"📊 Output Delta Lake: {output_path}")
+        logger.info(f"🔍 Elasticsearch: {elasticsearch_host}")
         """Start ML-powered streaming processing"""
         
         logger.info(f"🚀 Starting ML-powered streaming from Kafka topic: {topic}")
@@ -196,8 +297,42 @@ class MLLogProcessor:
         # Apply ML models if available
         ml_enriched_df = self.apply_ml_models(enriched_df)
         
-        # Add metadata for Elasticsearch
+        # Debug: Log the columns after ML processing
+        logger.info(f"🔍 Columns after ML processing: {ml_enriched_df.columns}")
+        
+        # Ensure all required columns exist for downstream processing
         final_df = ml_enriched_df \
+            .withColumn("is_anomaly", 
+                when(col("is_anomaly").isNotNull(), col("is_anomaly"))
+                .otherwise(lit(False))) \
+            .withColumn("anomaly_score", 
+                when(col("anomaly_score").isNotNull(), col("anomaly_score"))
+                .otherwise(lit(0.1))) \
+            .withColumn("ml_confidence", 
+                when(col("ml_confidence").isNotNull(), col("ml_confidence"))
+                .otherwise(lit("low"))) \
+            .withColumn("anomaly_type", 
+                when(col("anomaly_type").isNotNull(), col("anomaly_type"))
+                .otherwise(lit("NORMAL")))
+        
+        # Debug: Log the columns after ensuring required columns
+        logger.info(f"🔍 Columns after ensuring required columns: {final_df.columns}")
+        
+        # Debug: Show sample data
+        logger.info("🔍 Sample data structure:")
+        (final_df
+        .select("timestamp", "ip", "endpoint", "is_anomaly", "anomaly_score", "ml_confidence", "anomaly_type")
+        .writeStream
+        .outputMode("append")
+        .format("console")
+        .option("truncate", False)
+        .start()
+        .awaitTermination()
+    )
+
+        
+        # Add metadata for Elasticsearch
+        final_df = final_df \
             .withColumn("_id", 
                 concat(col("timestamp").cast("string"), lit("_"), 
                        col("ip"), lit("_"), col("endpoint"))) \
