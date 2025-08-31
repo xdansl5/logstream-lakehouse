@@ -8,11 +8,14 @@ import argparse
 import json
 import logging
 from datetime import datetime
+import os
 
 from delta import *
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
+from pyspark.ml import Pipeline, PipelineModel
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -35,8 +38,8 @@ except ImportError as e:
 
 class MLLogProcessor:
     """Class for ML-powered log processing with Spark, Kafka, and Elasticsearch."""
-
-    def __init__(self, app_name="MLLogProcessor"):
+    
+    def __init__(self, app_name="MLLogProcessor", model_path="/tmp/ml_models/anomaly_model"):
         # Enhanced Spark configuration for ML and streaming
         builder = (
             SparkSession.builder.appName(app_name)
@@ -55,6 +58,8 @@ class MLLogProcessor:
 
         self.spark = configure_spark_with_delta_pip(builder).getOrCreate()
         self.spark.sparkContext.setLogLevel("WARN")
+
+        self.MODEL_PATH = model_path
 
         # Initialize ML models
         self.anomaly_model = None
@@ -165,6 +170,7 @@ class MLLogProcessor:
                 .when(col("response_time") > 500, "MEDIUM_RESPONSE")
                 .otherwise("NORMAL"),
             )
+            .withColumn("detection_method", lit("RULE_BASED"))
         )
 
     # ---------------------------------------------------------
@@ -172,40 +178,45 @@ class MLLogProcessor:
     # ---------------------------------------------------------
 
     def train_anomaly_detection_model(self, training_data_path):
-        """Train anomaly detection model using K-means clustering."""
         if not ML_AVAILABLE:
             logger.warning("⚠️ ML libraries not available, skipping model training")
             return None
 
         logger.info("🔬 Training anomaly detection model...")
-
         try:
-            # Read training data
             training_df = self.spark.read.format("delta").load(training_data_path)
-
-            # Create numerical features for ML
             feature_cols = ["response_time", "status_code", "bytes_sent"]
             assembler = VectorAssembler(inputCols=feature_cols, outputCol="features")
-
-            # Standardize features
             scaler = StandardScaler(inputCol="features", outputCol="scaled_features")
-
-            # K-means clustering for anomaly detection
             kmeans = KMeans(k=3, seed=42, featuresCol="scaled_features")
-
-            # Create pipeline
             pipeline = Pipeline(stages=[assembler, scaler, kmeans])
 
-            # Train model
             self.anomaly_model = pipeline.fit(training_df)
             logger.info("✅ Anomaly detection model trained successfully")
 
+            os.makedirs(os.path.dirname(self.MODEL_PATH), exist_ok=True)
+            self.anomaly_model.write().overwrite().save(self.MODEL_PATH)
+            logger.info(f"💾 Model saved to {self.MODEL_PATH}")
             return self.anomaly_model
 
         except Exception as e:
             logger.error(f"❌ ML model training failed: {e}")
-            logger.info("🔄 Falling back to rule-based detection")
             return None
+        
+
+    def load_anomaly_detection_model(self):
+        if not ML_AVAILABLE:
+            logger.warning("⚠️ ML libraries not available, cannot load model")
+            return None
+
+        if os.path.exists(self.MODEL_PATH):
+            try:
+                self.anomaly_model = PipelineModel.load(self.MODEL_PATH)
+                logger.info(f"✅ Loaded anomaly detection model from {self.MODEL_PATH}")
+            except Exception as e:
+                logger.error(f"❌ Failed to load model: {e}")
+        else:
+            logger.warning(f"⚠️ Model not found at {self.MODEL_PATH}, will use rule-based detection")
 
     def apply_ml_models(self, df):
         """Apply trained ML models to streaming data."""
@@ -214,13 +225,8 @@ class MLLogProcessor:
             return self.apply_rule_based_anomaly_detection(df)
 
         try:
-            df_with_features = df.withColumn(
-                "features",
-                array(col("response_time"), col("status_code"), col("bytes_sent")),
-            )
-
-            # Make predictions
-            predictions = self.anomaly_model.transform(df_with_features)
+            # Usa direttamente il dataframe originale, senza ricreare 'features'
+            predictions = self.anomaly_model.transform(df)
 
             return (
                 predictions.withColumn(
@@ -242,6 +248,7 @@ class MLLogProcessor:
                     .when(col("prediction") == 1, "MEDIUM_RISK")
                     .otherwise("HIGH_RISK"),
                 )
+                .withColumn("detection_method", lit("ML"))
             )
 
         except Exception as e:
@@ -256,26 +263,21 @@ class MLLogProcessor:
         self,
         kafka_servers="localhost:9092",
         topic="web-logs",
-        output_path="/tmp/delta-lake/ml-enriched-logs",
-        checkpoint_path="/tmp/checkpoints/ml-logs",
+        output_path="/tmp/delta-lake/rule-based-logs",
+        ml_output_path="/tmp/delta-lake/ml-predictions",
+        checkpoint_path="/tmp/checkpoints/logs",
         elasticsearch_host="localhost:9200",
     ):
         """Start ML-powered streaming processing."""
         logger.info(f"🚀 Starting ML-powered streaming from Kafka topic: {topic}")
-        logger.info(f"📊 Output Delta Lake: {output_path}")
-        logger.info(f"🔍 Elasticsearch: {elasticsearch_host}")
-        """Start ML-powered streaming processing"""
-        
-        logger.info(f"🚀 Starting ML-powered streaming from Kafka topic: {topic}")
-        logger.info(f"📊 Output Delta Lake: {output_path}")
-        logger.info(f"🔍 Elasticsearch: {elasticsearch_host}")
+        logger.info(f"📊 Rule-based logs Delta Lake: {output_path}")
+        logger.info(f"🤖 ML predictions Delta Lake: {ml_output_path}")
         
         # Define schema
         log_schema = self.define_enhanced_schema()
         
         # Read from Kafka
-        kafka_df = self.spark \
-            .readStream \
+        kafka_df = self.spark.readStream \
             .format("kafka") \
             .option("kafka.bootstrap.servers", kafka_servers) \
             .option("subscribe", topic) \
@@ -285,8 +287,7 @@ class MLLogProcessor:
             .load()
         
         # Parse JSON and apply transformations
-        parsed_df = kafka_df \
-            .select(from_json(col("value").cast("string"), log_schema).alias("data")) \
+        parsed_df = kafka_df.select(from_json(col("value").cast("string"), log_schema).alias("data")) \
             .select("data.*") \
             .withColumn("timestamp", to_timestamp(col("timestamp"))) \
             .filter(col("timestamp").isNotNull())
@@ -295,113 +296,83 @@ class MLLogProcessor:
         enriched_df = self.create_ml_features(parsed_df)
         
         # Apply ML models if available
+        self.load_anomaly_detection_model()
         ml_enriched_df = self.apply_ml_models(enriched_df)
         
-        # Debug: Log the columns after ML processing
-        logger.info(f"🔍 Columns after ML processing: {ml_enriched_df.columns}")
-        
-        # Ensure all required columns exist for downstream processing
+        # Ensure all required columns exist
         final_df = ml_enriched_df \
-            .withColumn("is_anomaly", 
-                when(col("is_anomaly").isNotNull(), col("is_anomaly"))
-                .otherwise(lit(False))) \
-            .withColumn("anomaly_score", 
-                when(col("anomaly_score").isNotNull(), col("anomaly_score"))
-                .otherwise(lit(0.1))) \
-            .withColumn("ml_confidence", 
-                when(col("ml_confidence").isNotNull(), col("ml_confidence"))
-                .otherwise(lit("low"))) \
-            .withColumn("anomaly_type", 
-                when(col("anomaly_type").isNotNull(), col("anomaly_type"))
-                .otherwise(lit("NORMAL")))
+            .withColumn("is_anomaly", when(col("is_anomaly").isNotNull(), col("is_anomaly")).otherwise(lit(False))) \
+            .withColumn("anomaly_score", when(col("anomaly_score").isNotNull(), col("anomaly_score")).otherwise(lit(0.1))) \
+            .withColumn("ml_confidence", when(col("ml_confidence").isNotNull(), col("ml_confidence")).otherwise(lit("low"))) \
+            .withColumn("anomaly_type", when(col("anomaly_type").isNotNull(), col("anomaly_type")).otherwise(lit("NORMAL")))
         
-        # Debug: Log the columns after ensuring required columns
-        logger.info(f"🔍 Columns after ensuring required columns: {final_df.columns}")
-        
-        # Debug: Show sample data
-        logger.info("🔍 Sample data structure:")
-        (final_df
-        .select("timestamp", "ip", "endpoint", "is_anomaly", "anomaly_score", "ml_confidence", "anomaly_type")
-        .writeStream
-        .outputMode("append")
-        .format("console")
-        .option("truncate", False)
-        .start()
-        .awaitTermination()
-    )
+        # --- INIZIO MODIFICHE ---
 
-        
-        # Add metadata for Elasticsearch
-        final_df = final_df \
-            .withColumn("_id", 
-                concat(col("timestamp").cast("string"), lit("_"), 
-                       col("ip"), lit("_"), col("endpoint"))) \
-            .withColumn("@timestamp", col("timestamp")) \
-            .withColumn("log_level", 
-                when(col("is_anomaly"), "WARN")
-                .when(col("is_error"), "ERROR")
-                .otherwise("INFO")) \
-            .withColumn("tags", 
-                array(col("endpoint_category"), col("method_category"), 
-                      col("ip_class"), col("ml_confidence")))
-        
-        # Write to Delta Lake
-        delta_query = final_df \
+        # 1. Aggiungi uno stream di output sulla console per il monitoraggio in tempo reale
+        console_query = final_df \
+            .select("timestamp", "ip", "endpoint", "is_anomaly", "anomaly_type", "ml_confidence", "detection_method") \
             .writeStream \
+            .format("console") \
+            .outputMode("append") \
+            .option("truncate", "false") \
+            .start()
+        logger.info("✅ Real-time prediction console view started.")
+
+        # 2. Separa i log basati su ML da quelli basati su regole
+        ml_predictions_df = final_df.filter(col("detection_method") == "ML")
+        rule_based_df = final_df.filter(col("detection_method") == "RULE_BASED")
+
+        # Rimuovi le colonne intermedie del ML prima di salvare
+        ml_sink = ml_predictions_df.drop("features", "scaled_features", "prediction")
+        rule_sink = rule_based_df.drop("features", "scaled_features", "prediction")
+
+        # 3. Sink per i log basati su regole (percorso originale)
+        delta_query_rules = rule_sink.writeStream \
             .format("delta") \
             .outputMode("append") \
-            .option("checkpointLocation", checkpoint_path) \
+            .option("checkpointLocation", f"{checkpoint_path}/rules") \
+            .option("mergeSchema", "true") \
             .partitionBy("date", "hour") \
             .option("path", output_path) \
             .trigger(processingTime='10 seconds') \
             .start()
-        
-        # Write to Elasticsearch (if configured)
-        if elasticsearch_host != "none":
-            es_query = final_df \
-                .writeStream \
-                .format("org.elasticsearch.spark.sql") \
-                .option("es.nodes", elasticsearch_host) \
-                .option("es.index.auto.create", "true") \
-                .option("es.mapping.id", "_id") \
-                .option("es.write.operation", "index") \
-                .option("es.batch.size.entries", "100") \
-                .option("es.batch.size.bytes", "5mb") \
-                .option("es.batch.write.refresh", "false") \
-                .option("checkpointLocation", f"{checkpoint_path}/elasticsearch") \
-                .trigger(processingTime='10 seconds') \
-                .start()
-        
-        # Console output for monitoring
-        console_query = final_df \
-            .writeStream \
-            .outputMode("append") \
-            .format("console") \
-            .option("truncate", False) \
-            .option("numRows", 20) \
-            .trigger(processingTime='30 seconds') \
-            .start()
-        
-        logger.info("✅ ML streaming pipeline started!")
-        
-        try:
-            # Wait for termination
-            delta_query.awaitTermination()
-        except KeyboardInterrupt:
-            logger.info("🛑 Stopping ML streaming pipeline...")
-            delta_query.stop()
-            console_query.stop()
-            if elasticsearch_host != "none":
-                es_query.stop()
-            logger.info("✅ ML streaming pipeline stopped")
+        logger.info(f"✅ Rule-based streaming pipeline started! Writing to {output_path}")
 
-    def run_ml_analytics(self, ml_logs_path="/tmp/delta-lake/ml-enriched-logs"):
+        # 4. Sink per i log basati su ML (nuovo percorso)
+        delta_query_ml = ml_sink.writeStream \
+            .format("delta") \
+            .outputMode("append") \
+            .option("checkpointLocation", f"{checkpoint_path}/ml") \
+            .option("mergeSchema", "true") \
+            .partitionBy("date", "hour") \
+            .option("path", ml_output_path) \
+            .trigger(processingTime='10 seconds') \
+            .start()
+        logger.info(f"✅ ML predictions streaming pipeline started! Writing to {ml_output_path}")
+
+        # --- FINE MODIFICHE ---
+
+        try:
+            # Attendi la terminazione di uno qualsiasi degli stream per mantenere il driver attivo
+            self.spark.streams.awaitAnyTermination()
+        except KeyboardInterrupt:
+            logger.info("🛑 Stopping all streaming pipelines...")
+            # Interrompi tutti gli stream attivi in modo pulito
+            for query in self.spark.streams.active:
+                query.stop()
+            logger.info("✅ All streaming pipelines stopped")
+
+
+    def run_ml_analytics(self, ml_logs_path="/tmp/delta-lake/rule-based-logs"):
         """Run ML analytics on enriched logs"""
         logger.info(f"📈 Running ML analytics on: {ml_logs_path}")
         
         # Read enriched logs
         logs_df = self.spark.read.format("delta").load(ml_logs_path)
-        logs_df.createOrReplaceTempView("ml_logs")
+        logs_df.printSchema()
+        logs_df.show(5)
+
+        logs_df.createOrReplaceTempView("logs")
         
         # ML Analytics queries
         logger.info("\n=== ANOMALY DETECTION RESULTS ===")
@@ -420,7 +391,7 @@ class MLLogProcessor:
                     END as anomaly_type,
                     anomaly_score,
                     endpoint
-                FROM ml_logs
+                FROM logs
                 WHERE date >= current_date() - 1
             )
             GROUP BY anomaly_type
@@ -435,7 +406,7 @@ class MLLogProcessor:
                 COUNT(*) as predictions,
                 AVG(anomaly_score) as avg_score,
                 SUM(CASE WHEN is_anomaly THEN 1 ELSE 0 END) as anomalies_detected
-            FROM ml_logs
+            FROM logs
             WHERE date >= current_date() - 1
             GROUP BY ml_confidence
             ORDER BY predictions DESC
@@ -449,7 +420,7 @@ class MLLogProcessor:
                 COUNT(*) as total_requests,
                 AVG(anomaly_score) as avg_anomaly_score,
                 SUM(CASE WHEN is_anomaly THEN 1 ELSE 0 END) as anomalies
-            FROM ml_logs
+            FROM logs
             WHERE date >= current_date() - 1
             GROUP BY hour
             ORDER BY hour
@@ -462,10 +433,11 @@ if __name__ == "__main__":
                        default='stream', help='Execution mode')
     parser.add_argument('--kafka-servers', default='localhost:9092', help='Kafka bootstrap servers')
     parser.add_argument('--topic', default='web-logs', help='Kafka topic')
-    parser.add_argument('--output-path', default='/tmp/delta-lake/ml-enriched-logs', help='Delta Lake output path')
-    parser.add_argument('--checkpoint-path', default='/tmp/checkpoints/ml-logs', help='Checkpoint location')
+    parser.add_argument('--output-path', default='/tmp/delta-lake/rule-based-logs', help='Delta Lake output path for rule-based logs')
+    parser.add_argument('--ml-output-path', default='/tmp/delta-lake/ml-predictions', help='Delta Lake output path for ML predictions')
+    parser.add_argument('--checkpoint-path', default='/tmp/checkpoints/logs', help='Base checkpoint location for streams')
     parser.add_argument('--elasticsearch-host', default='localhost:9200', help='Elasticsearch host')
-    parser.add_argument('--training-data', default='/tmp/delta-lake/logs', help='Training data path')
+    parser.add_argument('--training-data', default='/tmp/delta-lake/rule-based-logs', help='Training data path')
     
     args = parser.parse_args()
     
@@ -476,10 +448,11 @@ if __name__ == "__main__":
             kafka_servers=args.kafka_servers,
             topic=args.topic,
             output_path=args.output_path,
+            ml_output_path=args.ml_output_path,
             checkpoint_path=args.checkpoint_path,
             elasticsearch_host=args.elasticsearch_host
         )
     elif args.mode == 'analytics':
-        processor.run_ml_analytics(args.output_path)
+        processor.run_ml_analytics(args.ml_output_path)
     elif args.mode == 'train':
         processor.train_anomaly_detection_model(args.training_data)

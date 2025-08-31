@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Log Generator - Simula log di un web server e li invia a Kafka
+Log Generator - Simulates web server logs and sends them to Kafka
 """
 
 import json
@@ -10,6 +10,14 @@ from datetime import datetime
 from kafka import KafkaProducer
 import argparse
 
+
+# -----------------------------------------------------------------------------
+# CLASS: LogGenerator
+# - Initializes a Kafka producer with JSON serialization
+# - Stores a topic name where logs will be sent
+# - Defines sample data (user agents, endpoints, methods, status codes)
+#   to generate realistic web server logs
+# -----------------------------------------------------------------------------
 class LogGenerator:
     def __init__(self, kafka_bootstrap_servers='localhost:9092', topic='web-logs'):
         self.producer = KafkaProducer(
@@ -35,15 +43,25 @@ class LogGenerator:
         self.status_codes = [200, 201, 400, 401, 404, 500, 502, 503]
         self.status_weights = [0.7, 0.1, 0.05, 0.03, 0.05, 0.02, 0.02, 0.03]
 
+
+    # -----------------------------------------------------------------------------
+    # METHOD: generate_log_entry
+    # - Generates one synthetic log entry with:
+    #   * timestamp, IP, HTTP method, endpoint
+    #   * status code (weighted probability)
+    #   * response time (depends on status)
+    #   * user_agent, user_id, session_id
+    #   * bytes_sent, referer
+    # - Returns the log entry as a dictionary
+    # -----------------------------------------------------------------------------
     def generate_log_entry(self):
-        """Genera un singolo log entry in formato JSON"""
         timestamp = datetime.now().isoformat()
         ip = f"192.168.{random.randint(1,255)}.{random.randint(1,255)}"
         method = random.choice(self.methods)
         endpoint = random.choice(self.endpoints)
         status_code = random.choices(self.status_codes, weights=self.status_weights)[0]
         
-        # Response time dipende dal status code
+        # Response time depends on status code
         if status_code >= 500:
             response_time = random.randint(2000, 5000)  # Server errors are slow
         elif status_code >= 400:
@@ -67,8 +85,16 @@ class LogGenerator:
         
         return log_entry
 
+
+    # -----------------------------------------------------------------------------
+    # METHOD: start_streaming
+    # - Starts a loop to continuously generate logs
+    # - Sends each generated log entry to Kafka
+    # - Respects a configured rate of logs per second
+    # - Stops after a specified duration or when interrupted
+    # - Prints progress every 100 logs
+    # -----------------------------------------------------------------------------
     def start_streaming(self, rate_per_second=5, duration_seconds=None):
-        """Inizia la generazione di log con il rate specificato"""
         print(f"Starting log generation at {rate_per_second} logs/second")
         print(f"Sending to Kafka topic: {self.topic}")
         
@@ -82,14 +108,14 @@ class LogGenerator:
                 
                 log_entry = self.generate_log_entry()
                 
-                # Invia a Kafka
+                # Send to Kafka
                 self.producer.send(self.topic, log_entry)
                 count += 1
                 
                 if count % 100 == 0:
                     print(f"Sent {count} log entries...")
                 
-                # Controlla il rate
+                # Enforce log generation rate
                 sleep_time = 1.0 / rate_per_second
                 time.sleep(sleep_time)
                 
@@ -98,6 +124,13 @@ class LogGenerator:
         finally:
             self.producer.close()
 
+
+# -----------------------------------------------------------------------------
+# MAIN EXECUTION
+# - Parses command-line arguments for rate, duration, Kafka servers, and topic
+# - Instantiates a LogGenerator with the given parameters
+# - Starts the streaming process
+# -----------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate web server logs and send to Kafka')
     parser.add_argument('--rate', type=int, default=5, help='Logs per second (default: 5)')

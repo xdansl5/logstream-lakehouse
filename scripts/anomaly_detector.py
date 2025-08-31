@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Anomaly Detection con Spark Structured Streaming
-Rileva anomalie nei pattern di traffico in tempo reale
+Anomaly Detection with Spark Structured Streaming
+Detects anomalies in traffic patterns in real time
 """
 
 from pyspark.sql import SparkSession
@@ -10,8 +10,11 @@ from pyspark.sql.types import *
 from delta import *
 import argparse
 
+
 class AnomalyDetector:
     def __init__(self, app_name="AnomalyDetector"):
+        # Initialize Spark session with Delta Lake integration
+        # Configure stateful operator checkpointing for reliability
         builder = SparkSession.builder.appName(app_name) \
             .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
             .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
@@ -22,18 +25,18 @@ class AnomalyDetector:
         self.spark = configure_spark_with_delta_pip(builder).getOrCreate()
         self.spark.sparkContext.setLogLevel("WARN")
 
-    def detect_traffic_anomalies(self, delta_path="/tmp/delta-lake/logs"):
-        """Rileva anomalie nel traffico usando finestre temporali"""
+    def detect_traffic_anomalies(self, delta_path="/tmp/delta-lake/rule-based-logs"):
+        """Detect traffic anomalies using windowed aggregations"""
         
-        # Legge stream dalla tabella Delta
+        # Read streaming logs from Delta Lake table
         logs_stream = self.spark \
             .readStream \
             .format("delta") \
             .option("path", delta_path) \
             .load()
         
-        # Calcola metriche in finestre temporali di 1 minuto
-        # Usa approx_count_distinct invece di countDistinct per streaming
+        # Compute metrics in 1-minute windows with watermarking
+        # approx_count_distinct is used instead of countDistinct for streaming compatibility
         windowed_metrics = logs_stream \
             .withWatermark("timestamp", "2 minutes") \
             .groupBy(
@@ -45,11 +48,14 @@ class AnomalyDetector:
                 count("*").alias("request_count"),
                 avg("response_time").alias("avg_response_time"),
                 sum(when(col("is_error"), 1).otherwise(0)).alias("error_count"),
-                approx_count_distinct("ip", 0.05).alias("unique_ips")  # Fixed: replaced countDistinct
+                approx_count_distinct("ip", 0.05).alias("unique_ips")
             ) \
             .withColumn("error_rate", col("error_count") / col("request_count"))
         
-        # Rileva anomalie
+        # Define anomaly detection rules:
+        # - Traffic spike if requests exceed 1000
+        # - High error rate if more than 10% requests fail
+        # - Slow response if average response time > 2000 ms
         anomalies = windowed_metrics \
             .withColumn("is_traffic_spike", col("request_count") > 1000) \
             .withColumn("is_high_error_rate", col("error_rate") > 0.1) \
@@ -64,18 +70,18 @@ class AnomalyDetector:
         
         return anomalies
 
-    def start_anomaly_detection(self, delta_path="/tmp/delta-lake/logs", 
+    def start_anomaly_detection(self, delta_path="/tmp/delta-lake/rule-based-logs", 
                                output_path="/tmp/delta-lake/anomalies",
                                checkpoint_path="/tmp/checkpoints/anomalies"):
-        """Avvia il rilevamento anomalie in streaming"""
+        """Start real-time anomaly detection and output results"""
         
-        print(f"🔍 Avvio rilevamento anomalie...")
-        print(f"📊 Input: {delta_path}")
-        print(f"🚨 Output anomalie: {output_path}")
+        print(f"🔍 Starting anomaly detection...")
+        print(f"📊 Input stream: {delta_path}")
+        print(f"🚨 Anomalies output: {output_path}")
         
         anomalies_stream = self.detect_traffic_anomalies(delta_path)
         
-        # Scrittura anomalie su Delta Lake
+        # Write anomalies back to Delta Lake for persistence
         query = anomalies_stream \
             .writeStream \
             .format("delta") \
@@ -85,7 +91,7 @@ class AnomalyDetector:
             .trigger(processingTime='30 seconds') \
             .start()
         
-        # Console output per debug
+        # Additionally, output anomalies to console for debugging
         console_query = anomalies_stream \
             .writeStream \
             .outputMode("append") \
@@ -94,24 +100,26 @@ class AnomalyDetector:
             .trigger(processingTime='30 seconds') \
             .start()
         
-        print("✅ Rilevamento anomalie avviato!")
+        print("✅ Anomaly detection started!")
         
         try:
             query.awaitTermination()
         except KeyboardInterrupt:
-            print("\n🛑 Fermando rilevamento anomalie...")
+            print("\n🛑 Stopping anomaly detection...")
             query.stop()
             console_query.stop()
 
     def analyze_historical_anomalies(self, anomalies_path="/tmp/delta-lake/anomalies"):
-        """Analizza le anomalie storiche"""
+        """Analyze historical anomalies stored in Delta Lake"""
         
-        print("📈 Analizzando anomalie storiche...")
+        print("📈 Analyzing historical anomalies...")
         
+        # Load anomalies from Delta Lake
         anomalies_df = self.spark.read.format("delta").load(anomalies_path)
         anomalies_df.createOrReplaceTempView("anomalies")
         
-        print("\n=== RIEPILOGO ANOMALIE ===")
+        # Summarize anomalies by type
+        print("\n=== ANOMALY SUMMARY ===")
         summary = self.spark.sql("""
             SELECT anomaly_type, 
                    COUNT(*) as occurrences,
@@ -124,7 +132,8 @@ class AnomalyDetector:
         """)
         summary.show()
         
-        print("\n=== TOP ENDPOINT CON ANOMALIE ===")
+        # Identify top endpoints with the most anomalies
+        print("\n=== TOP ENDPOINTS WITH ANOMALIES ===")
         top_endpoints = self.spark.sql("""
             SELECT endpoint, anomaly_type, COUNT(*) as anomaly_count
             FROM anomalies
@@ -134,12 +143,14 @@ class AnomalyDetector:
         """)
         top_endpoints.show()
 
+
 if __name__ == "__main__":
+    # CLI arguments for mode (detect/analyze), input/output paths, and checkpointing
     parser = argparse.ArgumentParser(description='Anomaly detection for log streams')
     parser.add_argument('--mode', choices=['detect', 'analyze'], 
-                       default='detect', help='Modalità di esecuzione')
-    parser.add_argument('--input-path', default='/tmp/delta-lake/logs', help='Input Delta Lake path')
-    parser.add_argument('--output-path', default='/tmp/delta-lake/anomalies', help='Output path per anomalie')
+                       default='detect', help='Execution mode')
+    parser.add_argument('--input-path', default='/tmp/delta-lake/rule-based-logs', help='Input Delta Lake path')
+    parser.add_argument('--output-path', default='/tmp/delta-lake/anomalies', help='Output path for anomalies')
     parser.add_argument('--checkpoint-path', default='/tmp/checkpoints/anomalies', help='Checkpoint location')
     
     args = parser.parse_args()

@@ -37,7 +37,7 @@ class PipelineOrchestrator:
                 "topic": "web-logs"
             },
             "delta_lake": {
-                "logs_path": "/tmp/delta-lake/logs",
+                "logs_path": "/tmp/delta-lake/ml-enriched-logs",
                 "anomalies_path": "/tmp/delta-lake/anomalies",
                 "ml_enriched_path": "/tmp/delta-lake/ml-enriched-logs"
             },
@@ -143,7 +143,7 @@ class PipelineOrchestrator:
                 "python3", "enhanced_log_generator.py",
                 "--training-data", str(self.config["ml"]["training_samples"]),
                 "--output-file", "training_logs.json"
-            ], check=True, cwd="scripts")
+            ], check=True)
             
             # Train the model
             logger.info("🧠 Training anomaly detection model...")
@@ -151,7 +151,7 @@ class PipelineOrchestrator:
                 "python3", "ml_streaming_processor.py",
                 "--mode", "train",
                 "--training-data", self.config["delta_lake"]["logs_path"]
-            ], check=True, cwd="scripts")
+            ], check=True)
             
             logger.info("✅ ML model training completed successfully")
             return True
@@ -173,7 +173,7 @@ class PipelineOrchestrator:
             "--topic", self.config["kafka"]["topic"],
             "--output-path", self.config["delta_lake"]["logs_path"],
             "--checkpoint-path", self.config["checkpoints"]["logs"]
-        ], cwd="scripts")
+        ])
         
         # Wait a bit for the processor to start
         time.sleep(10)
@@ -189,7 +189,7 @@ class PipelineOrchestrator:
             "--output-path", self.config["delta_lake"]["ml_enriched_path"],
             "--checkpoint-path", self.config["checkpoints"]["ml_logs"],
             "--elasticsearch-host", elasticsearch_host
-        ], cwd="scripts")
+        ])
         
         # Wait a bit for the ML processor to start
         time.sleep(10)
@@ -202,7 +202,7 @@ class PipelineOrchestrator:
             "--input-path", self.config["delta_lake"]["logs_path"],
             "--output-path", self.config["delta_lake"]["anomalies_path"],
             "--checkpoint-path", self.config["checkpoints"]["anomalies"]
-        ], cwd="scripts")
+        ])
         
         logger.info("✅ All pipeline components started")
 
@@ -215,7 +215,7 @@ class PipelineOrchestrator:
             "--kafka-servers", self.config["kafka"]["servers"],
             "--topic", self.config["kafka"]["topic"],
             "--rate", "20"
-        ], cwd="scripts")
+        ])
         
         logger.info("✅ Log generation started")
 
@@ -258,7 +258,7 @@ class PipelineOrchestrator:
                     "--topic", self.config["kafka"]["topic"],
                     "--output-path", self.config["delta_lake"]["logs_path"],
                     "--checkpoint-path", self.config["checkpoints"]["logs"]
-                ], cwd="scripts")
+                ])
             elif process_name == "ml_processor":
                 elasticsearch_host = self.config["elasticsearch"]["host"] if self.config["elasticsearch"]["enabled"] else "none"
                 self.processes[process_name] = subprocess.Popen([
@@ -269,7 +269,7 @@ class PipelineOrchestrator:
                     "--output-path", self.config["delta_lake"]["ml_enriched_path"],
                     "--checkpoint-path", self.config["checkpoints"]["ml_logs"],
                     "--elasticsearch-host", elasticsearch_host
-                ], cwd="scripts")
+                ])
             elif process_name == "anomaly_detector":
                 self.processes[process_name] = subprocess.Popen([
                     "python3", "anomaly_detector.py",
@@ -277,7 +277,7 @@ class PipelineOrchestrator:
                     "--input-path", self.config["delta_lake"]["logs_path"],
                     "--output-path", self.config["delta_lake"]["anomalies_path"],
                     "--checkpoint-path", self.config["checkpoints"]["anomalies"]
-                ], cwd="scripts")
+                ])
             
             logger.info(f"✅ {process_name} restarted")
 
@@ -291,21 +291,21 @@ class PipelineOrchestrator:
                 "python3", "streaming_processor.py",
                 "--mode", "analytics",
                 "--output-path", self.config["delta_lake"]["logs_path"]
-            ], check=True, cwd="scripts")
+            ], check=True)
             
             # Run ML analytics
             subprocess.run([
                 "python3", "ml_streaming_processor.py",
                 "--mode", "analytics",
                 "--output-path", self.config["delta_lake"]["ml_enriched_path"]
-            ], check=True, cwd="scripts")
+            ], check=True)
             
             # Run anomaly analysis
             subprocess.run([
                 "python3", "anomaly_detector.py",
                 "--mode", "analyze",
                 "--output-path", self.config["delta_lake"]["anomalies_path"]
-            ], check=True, cwd="scripts")
+            ], check=True)
             
             logger.info("✅ Analytics completed successfully")
             
