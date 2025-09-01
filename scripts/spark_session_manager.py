@@ -26,6 +26,14 @@ def get_spark(app_name: str = "LogStreamApp") -> SparkSession:
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
         .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        # Ensure Kafka source is available for Structured Streaming
+        .config(
+            "spark.jars.packages",
+            ",".join([
+                "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0",
+                "org.apache.kafka:kafka-clients:3.5.0",
+            ]),
+        )
     )
 
     _spark_singleton = configure_spark_with_delta_pip(builder).getOrCreate()
