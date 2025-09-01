@@ -16,6 +16,8 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from pyspark.ml import Pipeline, PipelineModel
 from spark_session_manager import get_spark, stop_spark
+import os
+import signal
 
 
 # Configure logging
@@ -336,6 +338,19 @@ class MLLogProcessor:
         logger.info(f"✅ ML predictions streaming pipeline started! Writing to {ml_output_path}")
 
         # --- END STREAM SINKS ---
+
+        def _graceful_shutdown(*_args):
+            try:
+                for q in self.spark.streams.active:
+                    try:
+                        q.stop()
+                    except Exception:
+                        pass
+            finally:
+                stop_spark()
+
+        signal.signal(signal.SIGTERM, _graceful_shutdown)
+        signal.signal(signal.SIGINT, _graceful_shutdown)
 
         try:
             # Wait for any stream termination to keep the driver alive

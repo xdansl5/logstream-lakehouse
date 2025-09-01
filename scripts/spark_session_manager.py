@@ -5,6 +5,7 @@ All jobs should import `get_spark` to obtain the configured session.
 """
 
 from typing import Optional
+import os
 from pyspark.sql import SparkSession
 from delta import configure_spark_with_delta_pip
 
@@ -21,11 +22,21 @@ def get_spark(app_name: str = "LogStreamApp") -> SparkSession:
     if _spark_singleton is not None:
         return _spark_singleton
 
+    # UI/port configuration with safe defaults for multi-process usage
+    ui_enabled = os.getenv("SPARK_UI_ENABLED", "false").lower() in ("1", "true", "yes")
+    ui_port = os.getenv("SPARK_UI_PORT")
+    port_retries = os.getenv("SPARK_PORT_MAX_RETRIES", "64")
+    local_ip = os.getenv("SPARK_LOCAL_IP", "127.0.0.1")
+
     builder = (
         SparkSession.builder.appName(app_name)
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
         .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .config("spark.ui.enabled", str(ui_enabled).lower())
+        .config("spark.port.maxRetries", port_retries)
+        .config("spark.local.ip", local_ip)
+        .config("spark.driver.bindAddress", "0.0.0.0")
         # Ensure Kafka source is available for Structured Streaming
         .config(
             "spark.jars.packages",
@@ -35,6 +46,9 @@ def get_spark(app_name: str = "LogStreamApp") -> SparkSession:
             ]),
         )
     )
+
+    if ui_port:
+        builder = builder.config("spark.ui.port", ui_port)
 
     _spark_singleton = configure_spark_with_delta_pip(builder).getOrCreate()
     _spark_singleton.sparkContext.setLogLevel("WARN")

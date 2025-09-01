@@ -16,6 +16,7 @@ from delta import *
 from spark_session_manager import get_spark, stop_spark
 # CLI argument parser
 import argparse
+import os
 
 # -----------------------------------------------------------------------------
 # MAIN PROCESSING CLASS
@@ -267,9 +268,17 @@ if __name__ == "__main__":
     parser.add_argument('--topic', default='web-logs', help='Kafka topic')
     parser.add_argument('--output-path', default='/tmp/delta-lake/rule-based-logs', help='Delta Lake output path')
     parser.add_argument('--checkpoint-path', default='/tmp/checkpoints/logs', help='Checkpoint location')
+    parser.add_argument('--spark-ui', default='false', help='Enable Spark UI (true/false)')
+    parser.add_argument('--spark-ui-port', default=None, help='Spark UI port (optional)')
     
     args = parser.parse_args()
     
+    # Pass optional Spark UI env overrides to avoid port conflicts
+    if args.spark_ui:
+        os.environ["SPARK_UI_ENABLED"] = args.spark_ui
+    if args.spark_ui_port:
+        os.environ["SPARK_UI_PORT"] = str(args.spark_ui_port)
+
     processor = LogStreamProcessor()
     
     # Execute based on mode

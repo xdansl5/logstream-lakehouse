@@ -9,6 +9,7 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from delta import *
 from spark_session_manager import get_spark, stop_spark
+import signal
 import argparse
 
 
@@ -93,6 +94,16 @@ class AnomalyDetector:
             .start()
         
         print("✅ Anomaly detection started!")
+
+        def _graceful_shutdown(*_args):
+            try:
+                query.stop()
+                console_query.stop()
+            finally:
+                stop_spark()
+
+        signal.signal(signal.SIGTERM, _graceful_shutdown)
+        signal.signal(signal.SIGINT, _graceful_shutdown)
         
         try:
             query.awaitTermination()
