@@ -10,7 +10,6 @@ import logging
 from datetime import datetime
 import os
 
-from delta import *
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *

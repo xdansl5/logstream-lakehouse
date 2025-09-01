@@ -7,7 +7,6 @@ Detects anomalies in traffic patterns in real time
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
-from delta import *
 from spark_session_manager import get_spark, stop_spark
 import signal
 import argparse

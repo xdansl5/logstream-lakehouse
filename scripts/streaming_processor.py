@@ -12,7 +12,6 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 # Delta Lake integration for Spark
-from delta import *
 from spark_session_manager import get_spark, stop_spark
 # CLI argument parser
 import argparse

@@ -7,7 +7,6 @@ All jobs should import `get_spark` to obtain the configured session.
 from typing import Optional
 import os
 from pyspark.sql import SparkSession
-from delta import configure_spark_with_delta_pip
 
 _spark_singleton: Optional[SparkSession] = None
 
@@ -41,6 +40,7 @@ def get_spark(app_name: str = "LogStreamApp") -> SparkSession:
         .config(
             "spark.jars.packages",
             ",".join([
+                "io.delta:delta-spark_2.12:3.2.0",
                 "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0",
                 "org.apache.kafka:kafka-clients:3.5.0",
             ]),
@@ -50,7 +50,7 @@ def get_spark(app_name: str = "LogStreamApp") -> SparkSession:
     if ui_port:
         builder = builder.config("spark.ui.port", ui_port)
 
-    _spark_singleton = configure_spark_with_delta_pip(builder).getOrCreate()
+    _spark_singleton = builder.getOrCreate()
     _spark_singleton.sparkContext.setLogLevel("WARN")
     return _spark_singleton
 
