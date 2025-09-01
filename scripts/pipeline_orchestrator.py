@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class PipelineOrchestrator:
     def __init__(self, config_file="pipeline_config.json"):
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.config = self.load_config(config_file)
         self.processes = {}
         self.running = False
@@ -37,9 +38,10 @@ class PipelineOrchestrator:
                 "topic": "web-logs"
             },
             "delta_lake": {
-                "logs_path": "/tmp/delta-lake/ml-enriched-logs",
+                "logs_path": "/tmp/delta-lake/rule-based-logs",
                 "anomalies_path": "/tmp/delta-lake/anomalies",
-                "ml_enriched_path": "/tmp/delta-lake/ml-enriched-logs"
+                "ml_enriched_path": "/tmp/delta-lake/rule-based-logs",
+                "ml_predictions_path": "/tmp/delta-lake/ml-predictions"
             },
             "checkpoints": {
                 "logs": "/tmp/checkpoints/logs",
@@ -61,12 +63,16 @@ class PipelineOrchestrator:
             }
         }
         
-        if os.path.exists(config_file):
+        config_path = config_file
+        if not os.path.isabs(config_path):
+            config_path = os.path.join(self.script_dir, config_file)
+
+        if os.path.exists(config_path):
             try:
-                with open(config_file, 'r') as f:
+                with open(config_path, 'r') as f:
                     user_config = json.load(f)
                 default_config.update(user_config)
-                logger.info(f"✅ Loaded configuration from {config_file}")
+                logger.info(f"✅ Loaded configuration from {config_path}")
             except Exception as e:
                 logger.warning(f"⚠️ Error loading config file: {e}, using defaults")
         else:
@@ -119,14 +125,15 @@ class PipelineOrchestrator:
         logger.info("🔧 Setting up environment...")
         
         # Create directories
-        directories = [
+        directories = list({
             self.config["delta_lake"]["logs_path"],
             self.config["delta_lake"]["anomalies_path"],
-            self.config["delta_lake"]["ml_enriched_path"],
+            self.config["delta_lake"].get("ml_enriched_path", self.config["delta_lake"]["logs_path"]),
+            self.config["delta_lake"].get("ml_predictions_path", "/tmp/delta-lake/ml-predictions"),
             self.config["checkpoints"]["logs"],
             self.config["checkpoints"]["anomalies"],
             self.config["checkpoints"]["ml_logs"]
-        ]
+        })
         
         for directory in directories:
             os.makedirs(directory, exist_ok=True)
@@ -140,7 +147,7 @@ class PipelineOrchestrator:
             # Generate training data first
             logger.info("📚 Generating training dataset...")
             subprocess.run([
-                "python3", "enhanced_log_generator.py",
+                "python3", os.path.join(self.script_dir, "enhanced_log_generator.py"),
                 "--training-data", str(self.config["ml"]["training_samples"]),
                 "--output-file", "training_logs.json"
             ], check=True)
@@ -148,7 +155,7 @@ class PipelineOrchestrator:
             # Train the model
             logger.info("🧠 Training anomaly detection model...")
             subprocess.run([
-                "python3", "ml_streaming_processor.py",
+                "python3", os.path.join(self.script_dir, "ml_streaming_processor.py"),
                 "--mode", "train",
                 "--training-data", self.config["delta_lake"]["logs_path"]
             ], check=True)
@@ -167,7 +174,7 @@ class PipelineOrchestrator:
         # Start basic streaming processor
         logger.info("📊 Starting basic streaming processor...")
         self.processes["streaming_processor"] = subprocess.Popen([
-            "python3", "streaming_processor.py",
+            "python3", os.path.join(self.script_dir, "streaming_processor.py"),
             "--mode", "stream",
             "--kafka-servers", self.config["kafka"]["servers"],
             "--topic", self.config["kafka"]["topic"],
@@ -182,11 +189,12 @@ class PipelineOrchestrator:
         logger.info("🤖 Starting ML streaming processor...")
         elasticsearch_host = self.config["elasticsearch"]["host"] if self.config["elasticsearch"]["enabled"] else "none"
         self.processes["ml_processor"] = subprocess.Popen([
-            "python3", "ml_streaming_processor.py",
+            "python3", os.path.join(self.script_dir, "ml_streaming_processor.py"),
             "--mode", "stream",
             "--kafka-servers", self.config["kafka"]["servers"],
             "--topic", self.config["kafka"]["topic"],
-            "--output-path", self.config["delta_lake"]["ml_enriched_path"],
+            "--output-path", self.config["delta_lake"]["logs_path"],
+            "--ml-output-path", self.config["delta_lake"].get("ml_predictions_path", "/tmp/delta-lake/ml-predictions"),
             "--checkpoint-path", self.config["checkpoints"]["ml_logs"],
             "--elasticsearch-host", elasticsearch_host
         ])
@@ -197,7 +205,7 @@ class PipelineOrchestrator:
         # Start anomaly detector
         logger.info("🚨 Starting anomaly detector...")
         self.processes["anomaly_detector"] = subprocess.Popen([
-            "python3", "anomaly_detector.py",
+            "python3", os.path.join(self.script_dir, "anomaly_detector.py"),
             "--mode", "detect",
             "--input-path", self.config["delta_lake"]["logs_path"],
             "--output-path", self.config["delta_lake"]["anomalies_path"],
@@ -211,7 +219,7 @@ class PipelineOrchestrator:
         logger.info("📝 Starting log generation...")
         
         self.processes["log_generator"] = subprocess.Popen([
-            "python3", "enhanced_log_generator.py",
+            "python3", os.path.join(self.script_dir, "enhanced_log_generator.py"),
             "--kafka-servers", self.config["kafka"]["servers"],
             "--topic", self.config["kafka"]["topic"],
             "--rate", "20"
@@ -252,7 +260,7 @@ class PipelineOrchestrator:
             # Restart based on process type
             if process_name == "streaming_processor":
                 self.processes[process_name] = subprocess.Popen([
-                    "python3", "streaming_processor.py",
+                    "python3", os.path.join(self.script_dir, "streaming_processor.py"),
                     "--mode", "stream",
                     "--kafka-servers", self.config["kafka"]["servers"],
                     "--topic", self.config["kafka"]["topic"],
@@ -262,17 +270,18 @@ class PipelineOrchestrator:
             elif process_name == "ml_processor":
                 elasticsearch_host = self.config["elasticsearch"]["host"] if self.config["elasticsearch"]["enabled"] else "none"
                 self.processes[process_name] = subprocess.Popen([
-                    "python3", "ml_streaming_processor.py",
+                    "python3", os.path.join(self.script_dir, "ml_streaming_processor.py"),
                     "--mode", "stream",
                     "--kafka-servers", self.config["kafka"]["servers"],
                     "--topic", self.config["kafka"]["topic"],
-                    "--output-path", self.config["delta_lake"]["ml_enriched_path"],
+                    "--output-path", self.config["delta_lake"]["logs_path"],
+                    "--ml-output-path", self.config["delta_lake"].get("ml_predictions_path", "/tmp/delta-lake/ml-predictions"),
                     "--checkpoint-path", self.config["checkpoints"]["ml_logs"],
                     "--elasticsearch-host", elasticsearch_host
                 ])
             elif process_name == "anomaly_detector":
                 self.processes[process_name] = subprocess.Popen([
-                    "python3", "anomaly_detector.py",
+                    "python3", os.path.join(self.script_dir, "anomaly_detector.py"),
                     "--mode", "detect",
                     "--input-path", self.config["delta_lake"]["logs_path"],
                     "--output-path", self.config["delta_lake"]["anomalies_path"],
@@ -288,21 +297,21 @@ class PipelineOrchestrator:
         try:
             # Run basic analytics
             subprocess.run([
-                "python3", "streaming_processor.py",
+                "python3", os.path.join(self.script_dir, "streaming_processor.py"),
                 "--mode", "analytics",
                 "--output-path", self.config["delta_lake"]["logs_path"]
             ], check=True)
             
             # Run ML analytics
             subprocess.run([
-                "python3", "ml_streaming_processor.py",
+                "python3", os.path.join(self.script_dir, "ml_streaming_processor.py"),
                 "--mode", "analytics",
-                "--output-path", self.config["delta_lake"]["ml_enriched_path"]
+                "--output-path", self.config["delta_lake"].get("ml_predictions_path", "/tmp/delta-lake/ml-predictions")
             ], check=True)
             
             # Run anomaly analysis
             subprocess.run([
-                "python3", "anomaly_detector.py",
+                "python3", os.path.join(self.script_dir, "anomaly_detector.py"),
                 "--mode", "analyze",
                 "--output-path", self.config["delta_lake"]["anomalies_path"]
             ], check=True)

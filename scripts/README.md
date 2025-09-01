@@ -1,8 +1,8 @@
-# Lakehouse Analytics Platform - Scripts PySpark
+# Lakehouse Analytics Platform - PySpark Scripts
 
-Questa directory contiene tutti gli script Python/PySpark per implementare una pipeline completa di analisi dati in tempo reale con architettura Lakehouse.
+This directory contains all Python/PySpark scripts to implement a complete real-time data pipeline using a Lakehouse architecture.
 
-## 🏗️ Architettura
+## 🏗️ Architecture
 
 ```
 [Log Generator] → [Kafka] → [Spark Streaming] → [Delta Lake] → [Analytics/ML]
@@ -10,78 +10,70 @@ Questa directory contiene tutti gli script Python/PySpark per implementare una p
                              [Anomaly Detection]
 ```
 
-## 📁 File Principali
+## 📁 Key Files
 
-### `log_generator.py`
-Genera log realistici di un web server e li invia a Kafka in tempo reale.
+### `enhanced_log_generator.py`
+Generates realistic web server logs and publishes them to Kafka in real-time.
 
-**Caratteristiche:**
-- Simula traffico web con endpoint realistici
-- Genera errori e anomalie in modo controllato
-- Configurabile per rate e durata
-- Output in formato JSON
+**Features:**
+- Realistic traffic patterns and endpoints
+- Controlled error and anomaly generation
+- Configurable rate and duration
+- JSON output
 
-**Uso:**
+**Usage:**
 ```bash
-# Genera 10 log/secondo per 5 minuti
-python3 log_generator.py --rate 10 --duration 300
+# Generate 10 logs/second for 5 minutes
+python3 enhanced_log_generator.py --rate 10 --duration 300
 
-# Genera continuamente a 5 log/secondo
-python3 log_generator.py --rate 5
+# Generate continuously at 5 logs/second
+python3 enhanced_log_generator.py --rate 5
 ```
 
 ### `streaming_processor.py`
-Core della pipeline - elabora i log da Kafka usando Spark Structured Streaming e li scrive su Delta Lake.
+Core of the pipeline — processes logs from Kafka with Spark Structured Streaming and writes to Delta Lake.
 
-**Funzionalità:**
-- **Structured Streaming**: Legge da Kafka in tempo reale
-- **Data Enrichment**: Arricchisce i log con metadati
-- **Delta Lake**: Scrittura transazionale e versionata
-- **Partitioning**: Ottimizzazione per query performance
-- **Watermarking**: Gestione late-arriving data
+**Capabilities:**
+- **Structured Streaming**: Reads from Kafka in real-time
+- **Data Enrichment**: Adds metadata to logs
+- **Delta Lake**: Transactional, versioned writes
+- **Partitioning**: Optimizes query performance
+- **Watermarking**: Manages late-arriving data
 
-**Modalità:**
+**Modes:**
 ```bash
-# Streaming in tempo reale
+# Real-time streaming
 python3 streaming_processor.py --mode stream
 
-# Analytics batch sui dati storici
+# Batch analytics on historical data
 python3 streaming_processor.py --mode analytics
 
-# Ottimizzazione tabelle Delta
+# Delta table optimization
 python3 streaming_processor.py --mode optimize
 ```
 
 ### `anomaly_detector.py`
-Rileva anomalie nei pattern di traffico usando finestre temporali scorrevoli.
+Detects anomalies in traffic patterns using sliding time windows.
 
-**Algoritmi:**
+**Algorithms:**
 - Traffic spike detection
 - Error rate anomalies
 - Response time anomalies
 - IP-based pattern analysis
 
-**Uso:**
+**Usage:**
 ```bash
-# Rilevamento real-time
+# Real-time detection
 python3 anomaly_detector.py --mode detect
 
-# Analisi anomalie storiche
+# Analyze historical anomalies
 python3 anomaly_detector.py --mode analyze
 ```
 
-### `demo_pipeline.py`
-Demo orchestrata che avvia tutti i componenti della pipeline.
+### Removed legacy demo scripts
+`demo_pipeline.py` and `log_generator.py` were removed in favor of `pipeline_orchestrator.py` and `enhanced_log_generator.py`.
 
-```bash
-# Demo completa (tutti i componenti)
-python3 demo_pipeline.py --mode full
-
-# Solo analytics su dati esistenti
-python3 demo_pipeline.py --mode analytics
-```
-
-## 🚀 Setup e Installazione
+## 🚀 Setup and Installation
 
 ### 1. Setup Environment
 ```bash
@@ -89,31 +81,31 @@ chmod +x setup_environment.sh
 ./setup_environment.sh
 ```
 
-Questo script:
-- Installa Apache Spark
-- Configura Delta Lake
-- Avvia Kafka con Docker
-- Crea le directory necessarie
+This script:
+- Installs Apache Spark
+- Configures Delta Lake
+- Starts Kafka via Docker
+- Creates required directories
 
-### 2. Installa Dipendenze Python
+### 2. Install Python Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Verifica Kafka
+### 3. Verify Kafka
 ```bash
-# Controlla che Kafka sia attivo
+# Check Kafka is running
 docker-compose ps
 
-# Visualizza i topic
+# List topics
 docker-compose exec kafka kafka-topics --list --bootstrap-server localhost:29092
 ```
 
-## 🎯 Concetti Spark Dimostrati
+## 🎯 Spark Concepts Demonstrated
 
 ### 1. **Spark Structured Streaming**
 ```python
-# Lettura da Kafka
+# Read from Kafka
 kafka_df = spark \
     .readStream \
     .format("kafka") \
@@ -124,7 +116,7 @@ kafka_df = spark \
 
 ### 2. **Delta Lake Integration**
 ```python
-# Scrittura transazionale su Delta Lake
+# Transactional write to Delta Lake
 query = enriched_df \
     .writeStream \
     .format("delta") \
@@ -134,7 +126,7 @@ query = enriched_df \
     .start()
 ```
 
-### 3. **Watermarking per Late Data**
+### 3. **Watermarking for Late Data**
 ```python
 windowed_df = logs_stream \
     .withWatermark("timestamp", "2 minutes") \
@@ -142,7 +134,7 @@ windowed_df = logs_stream \
     .count()
 ```
 
-### 4. **Ottimizzazioni Performance**
+### 4. **Performance Optimizations**
 ```python
 # Z-Ordering per query performance
 spark.sql("OPTIMIZE logs ZORDER BY (endpoint, status_code)")
@@ -151,9 +143,9 @@ spark.sql("OPTIMIZE logs ZORDER BY (endpoint, status_code)")
 spark.sql("VACUUM logs RETAIN 168 HOURS")
 ```
 
-## 📊 Esempi di Query Analytics
+## 📊 Analytics Query Examples
 
-### Top Endpoint per Errori
+### Top Error Endpoints
 ```sql
 SELECT endpoint, COUNT(*) as error_count
 FROM logs 
@@ -163,7 +155,7 @@ GROUP BY endpoint
 ORDER BY error_count DESC
 ```
 
-### Pattern Temporali
+### Temporal Patterns
 ```sql
 SELECT hour, 
        COUNT(*) as requests,
@@ -175,7 +167,7 @@ GROUP BY hour
 ORDER BY hour
 ```
 
-### Rilevamento Anomalie
+### Anomaly Detection
 ```sql
 SELECT window.start, endpoint,
        COUNT(*) as request_count,
@@ -187,9 +179,9 @@ WHERE request_count > (
 )
 ```
 
-## 🔧 Configurazioni Avanzate
+## 🔧 Advanced Configuration
 
-### Tuning Spark per Streaming
+### Spark Tuning for Streaming
 ```python
 spark.conf.set("spark.sql.adaptive.enabled", "true")
 spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
@@ -205,29 +197,29 @@ df = spark.read.format("delta").option("versionAsOf", 0).load("/path/to/table")
 df = spark.read.format("delta").option("timestampAsOf", "2024-01-01").load("/path/to/table")
 ```
 
-## 🎮 Workflow Tipico
+## 🎮 Typical Workflow
 
-1. **Setup iniziale:**
+1. **Initial setup:**
    ```bash
    ./setup_environment.sh
    ```
 
-2. **Avvia pipeline completa:**
+2. **Start the full pipeline:**
    ```bash
    python3 demo_pipeline.py
    ```
 
-3. **In parallelo, monitora:**
+3. **In parallel, monitor:**
    - Kafka UI: http://localhost:8080
-   - Controlla i dati in Delta Lake
-   - Esegui query analytics
+   - Inspect Delta Lake data
+   - Run analytics queries
 
-4. **Analytics interattive:**
+4. **Interactive analytics:**
    ```bash
    python3 streaming_processor.py --mode analytics
    ```
 
-## 📈 Monitoring e Debugging
+## 📈 Monitoring & Debugging
 
 ### Check Streaming Status
 ```python
@@ -268,7 +260,7 @@ export SPARK_DRIVER_MEMORY=4g
 export SPARK_EXECUTOR_MEMORY=4g
 ```
 
-## 📚 Risorse Aggiuntive
+## 📚 Additional Resources
 
 - [Apache Spark Structured Streaming Guide](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html)
 - [Delta Lake Documentation](https://docs.delta.io/)
@@ -276,4 +268,4 @@ export SPARK_EXECUTOR_MEMORY=4g
 
 ---
 
-**Buon divertimento con la tua pipeline Lakehouse! 🚀**
+**Enjoy your Lakehouse pipeline! 🚀**

@@ -8,22 +8,14 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from delta import *
+from spark_session_manager import get_spark, stop_spark
 import argparse
 
 
 class AnomalyDetector:
     def __init__(self, app_name="AnomalyDetector"):
-        # Initialize Spark session with Delta Lake integration
-        # Configure stateful operator checkpointing for reliability
-        builder = SparkSession.builder.appName(app_name) \
-            .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-            .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
-            .config("spark.sql.streaming.statefulOperator.checkpointing.enabled", "true") \
-            .config("spark.sql.streaming.statefulOperator.checkpointing.interval", "10") \
-            .config("spark.sql.streaming.statefulOperator.checkpointing.timeout", "60")
-        
-        self.spark = configure_spark_with_delta_pip(builder).getOrCreate()
-        self.spark.sparkContext.setLogLevel("WARN")
+        # Initialize or reuse shared Spark session
+        self.spark = get_spark(app_name)
 
     def detect_traffic_anomalies(self, delta_path="/tmp/delta-lake/rule-based-logs"):
         """Detect traffic anomalies using windowed aggregations"""
@@ -106,8 +98,11 @@ class AnomalyDetector:
             query.awaitTermination()
         except KeyboardInterrupt:
             print("\n🛑 Stopping anomaly detection...")
-            query.stop()
-            console_query.stop()
+            try:
+                query.stop()
+                console_query.stop()
+            finally:
+                stop_spark()
 
     def analyze_historical_anomalies(self, anomalies_path="/tmp/delta-lake/anomalies"):
         """Analyze historical anomalies stored in Delta Lake"""

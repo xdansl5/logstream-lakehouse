@@ -13,6 +13,7 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import *
 # Delta Lake integration for Spark
 from delta import *
+from spark_session_manager import get_spark, stop_spark
 # CLI argument parser
 import argparse
 
@@ -21,20 +22,8 @@ import argparse
 # -----------------------------------------------------------------------------
 class LogStreamProcessor:
     def __init__(self, app_name="LogStreamProcessor"):
-        # Initialize Spark session configured with Delta Lake support.
-        # Includes serializer optimizations and adaptive query execution.
-        builder = SparkSession.builder.appName(app_name) \
-            .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-            .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
-            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-            .config("spark.sql.adaptive.enabled", "true") \
-            .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
-        
-        # Apply Delta Lake integration
-        self.spark = configure_spark_with_delta_pip(builder).getOrCreate()
-        # Reduce log verbosity
-        self.spark.sparkContext.setLogLevel("WARN")
-        
+        # Initialize or reuse a shared Spark session via the manager.
+        self.spark = get_spark(app_name)
         print(f"✅ Spark Session initialized: {self.spark.version}")
 
     # -------------------------------------------------------------------------
@@ -193,6 +182,7 @@ class LogStreamProcessor:
         except KeyboardInterrupt:
             print("\n🛑 Stopping streaming...")
             query.stop()
+            stop_spark()
             print("✅ Streaming stopped")
 
     # -------------------------------------------------------------------------

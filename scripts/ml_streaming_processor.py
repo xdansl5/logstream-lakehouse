@@ -15,6 +15,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from pyspark.ml import Pipeline, PipelineModel
+from spark_session_manager import get_spark, stop_spark
 
 
 # Configure logging
@@ -40,24 +41,8 @@ class MLLogProcessor:
     """Class for ML-powered log processing with Spark, Kafka, and Elasticsearch."""
     
     def __init__(self, app_name="MLLogProcessor", model_path="/tmp/ml_models/anomaly_model"):
-        # Enhanced Spark configuration for ML and streaming
-        builder = (
-            SparkSession.builder.appName(app_name)
-            .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
-            .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
-            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-            .config("spark.sql.adaptive.enabled", "false")
-            .config("spark.sql.streaming.statefulOperator.checkpointing.enabled", "true")
-            .config("spark.sql.streaming.statefulOperator.checkpointing.interval", "10")
-            .config("spark.sql.streaming.statefulOperator.checkpointing.timeout", "60")
-            .config("spark.sql.streaming.minBatchesToRetain", "2")
-            .config("spark.sql.streaming.maxBatchesToRetainInMemory", "10")
-            .config("spark.memory.offHeap.enabled", "true")
-            .config("spark.memory.offHeap.size", "1g")
-        )
-
-        self.spark = configure_spark_with_delta_pip(builder).getOrCreate()
-        self.spark.sparkContext.setLogLevel("WARN")
+        # Reuse shared Spark session to avoid multiple SparkContext instances.
+        self.spark = get_spark(app_name)
 
         self.MODEL_PATH = model_path
 
@@ -225,7 +210,7 @@ class MLLogProcessor:
             return self.apply_rule_based_anomaly_detection(df)
 
         try:
-            # Usa direttamente il dataframe originale, senza ricreare 'features'
+            # Use the original dataframe without recomputing features
             predictions = self.anomaly_model.transform(df)
 
             return (
@@ -306,7 +291,7 @@ class MLLogProcessor:
             .withColumn("ml_confidence", when(col("ml_confidence").isNotNull(), col("ml_confidence")).otherwise(lit("low"))) \
             .withColumn("anomaly_type", when(col("anomaly_type").isNotNull(), col("anomaly_type")).otherwise(lit("NORMAL")))
         
-        # --- INIZIO MODIFICHE ---
+        # --- BEGIN STREAM SINKS ---
 
         # 1. Aggiungi uno stream di output sulla console per il monitoraggio in tempo reale
         console_query = final_df \
@@ -318,15 +303,15 @@ class MLLogProcessor:
             .start()
         logger.info("✅ Real-time prediction console view started.")
 
-        # 2. Separa i log basati su ML da quelli basati su regole
+        # 2. Separate ML-driven predictions from rule-based ones
         ml_predictions_df = final_df.filter(col("detection_method") == "ML")
         rule_based_df = final_df.filter(col("detection_method") == "RULE_BASED")
 
-        # Rimuovi le colonne intermedie del ML prima di salvare
+        # Drop intermediate ML columns before persisting
         ml_sink = ml_predictions_df.drop("features", "scaled_features", "prediction")
         rule_sink = rule_based_df.drop("features", "scaled_features", "prediction")
 
-        # 3. Sink per i log basati su regole (percorso originale)
+        # 3. Sink for rule-based logs (original path)
         delta_query_rules = rule_sink.writeStream \
             .format("delta") \
             .outputMode("append") \
@@ -338,7 +323,7 @@ class MLLogProcessor:
             .start()
         logger.info(f"✅ Rule-based streaming pipeline started! Writing to {output_path}")
 
-        # 4. Sink per i log basati su ML (nuovo percorso)
+        # 4. Sink for ML predictions (separate path)
         delta_query_ml = ml_sink.writeStream \
             .format("delta") \
             .outputMode("append") \
@@ -350,16 +335,20 @@ class MLLogProcessor:
             .start()
         logger.info(f"✅ ML predictions streaming pipeline started! Writing to {ml_output_path}")
 
-        # --- FINE MODIFICHE ---
+        # --- END STREAM SINKS ---
 
         try:
-            # Attendi la terminazione di uno qualsiasi degli stream per mantenere il driver attivo
+            # Wait for any stream termination to keep the driver alive
             self.spark.streams.awaitAnyTermination()
         except KeyboardInterrupt:
             logger.info("🛑 Stopping all streaming pipelines...")
-            # Interrompi tutti gli stream attivi in modo pulito
+            # Stop all active streams cleanly
             for query in self.spark.streams.active:
-                query.stop()
+                try:
+                    query.stop()
+                except Exception:
+                    pass
+            stop_spark()
             logger.info("✅ All streaming pipelines stopped")
 
 
