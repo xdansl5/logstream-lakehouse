@@ -137,11 +137,19 @@ class LogStreamProcessor:
         # - Filter out invalid rows with null timestamps
         # Spark transformations are lazy: actual computation starts only when
         # the streaming query is launched.
-        parsed_df = kafka_df \
-            .select(from_json(col("value").cast("string"), log_schema).alias("data")) \
-            .select("data.*") \
-            .withColumn("timestamp", to_timestamp(col("timestamp"))) \
-            .filter(col("timestamp").isNotNull())
+        parsed_df = (
+            kafka_df
+                .select(from_json(col("value").cast("string"), log_schema).alias("data"))
+                .select("data.*")
+                # Robustly parse ISO8601 strings like 2025-09-01T15:26:35.123456
+                .withColumn("timestamp_str", col("timestamp"))
+                .withColumn(
+                    "timestamp",
+                    to_timestamp(substring(col("timestamp_str"), 1, 19), "yyyy-MM-dd'T'HH:mm:ss")
+                )
+                .drop("timestamp_str")
+                .filter(col("timestamp").isNotNull())
+        )
 
         # ---------------------------------------------------------------------
         # DATA ENRICHMENT & DELTA LAKE WRITE

@@ -273,10 +273,18 @@ class MLLogProcessor:
             .load()
         
         # Parse JSON and apply transformations
-        parsed_df = kafka_df.select(from_json(col("value").cast("string"), log_schema).alias("data")) \
-            .select("data.*") \
-            .withColumn("timestamp", to_timestamp(col("timestamp"))) \
-            .filter(col("timestamp").isNotNull())
+        parsed_df = (
+            kafka_df
+                .select(from_json(col("value").cast("string"), log_schema).alias("data"))
+                .select("data.*")
+                .withColumn("timestamp_str", col("timestamp"))
+                .withColumn(
+                    "timestamp",
+                    to_timestamp(substring(col("timestamp_str"), 1, 19), "yyyy-MM-dd'T'HH:mm:ss")
+                )
+                .drop("timestamp_str")
+                .filter(col("timestamp").isNotNull())
+        )
         
         # Create ML features
         enriched_df = self.create_ml_features(parsed_df)
