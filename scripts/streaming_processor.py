@@ -149,6 +149,8 @@ class LogStreamProcessor:
                 )
                 .drop("timestamp_str")
                 .filter(col("timestamp").isNotNull())
+                .withColumn("date", to_date(col("timestamp")))
+                .withColumn("hour", hour(col("timestamp")))
         )
 
         # ---------------------------------------------------------------------
@@ -169,6 +171,7 @@ class LogStreamProcessor:
             .format("delta") \
             .outputMode("append") \
             .option("checkpointLocation", checkpoint_path) \
+            .option("mergeSchema", "true") \
             .partitionBy("date", "hour") \
             .option("path", output_path) \
             .trigger(processingTime='10 seconds') \

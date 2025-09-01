@@ -284,6 +284,8 @@ class MLLogProcessor:
                 )
                 .drop("timestamp_str")
                 .filter(col("timestamp").isNotNull())
+                .withColumn("date", to_date(col("timestamp")))
+                .withColumn("hour", hour(col("timestamp")))
         )
         
         # Create ML features
@@ -326,6 +328,7 @@ class MLLogProcessor:
             .outputMode("append") \
             .option("checkpointLocation", f"{checkpoint_path}/rules") \
             .option("mergeSchema", "true") \
+            .option("mergeSchema", "true") \
             .partitionBy("date", "hour") \
             .option("path", output_path) \
             .trigger(processingTime='10 seconds') \
@@ -337,6 +340,7 @@ class MLLogProcessor:
             .format("delta") \
             .outputMode("append") \
             .option("checkpointLocation", f"{checkpoint_path}/ml") \
+            .option("mergeSchema", "true") \
             .option("mergeSchema", "true") \
             .partitionBy("date", "hour") \
             .option("path", ml_output_path) \
