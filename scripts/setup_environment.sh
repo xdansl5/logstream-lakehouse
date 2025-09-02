@@ -1,19 +1,19 @@
 #!/bin/bash
 
-# Setup Environment per Lakehouse Platform
+# Setup Environment for Lakehouse Platform
 echo "Setting up Lakehouse Analytics Environment"
 
-# Crea directory
+# Create directories
 mkdir -p /tmp/delta-lake/logs
 mkdir -p /tmp/delta-lake/anomalies
 mkdir -p /tmp/checkpoints/logs
 mkdir -p /tmp/checkpoints/anomalies
 
-# Installa dipendenze Python
+# Install Python dependencies
 echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
-# Download Spark se non presente
+# Download Spark if not present
 SPARK_VERSION="3.5.0"
 HADOOP_VERSION="3"
 SPARK_HOME="/opt/spark"
@@ -27,18 +27,18 @@ if [ ! -d "$SPARK_HOME" ]; then
     sudo chown -R $USER:$USER $SPARK_HOME
 fi
 
-# Configura environment variables
+# Configure environment variables
 echo "Configuring environment variables..."
 export SPARK_HOME=/opt/spark
 export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
 export PYSPARK_PYTHON=python3
 
-# Aggiungi al .bashrc per persistenza
+# Persist environment variables in .bashrc
 echo "export SPARK_HOME=/opt/spark" >> ~/.bashrc
 echo "export PATH=\$PATH:\$SPARK_HOME/bin:\$SPARK_HOME/sbin" >> ~/.bashrc
 echo "export PYSPARK_PYTHON=python3" >> ~/.bashrc
 
-# Setup Kafka (usando Docker Compose)
+# Setup Kafka (using Docker Compose)
 echo "Setting up Kafka with Docker..."
 cat > docker-compose.yml << EOF
 version: '3.8'
@@ -87,16 +87,16 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 EOF
 
-# Avvia Kafka
+# Start Kafka
 if command -v docker-compose &> /dev/null; then
     echo "Starting Kafka..."
     docker-compose up -d
     
-    # Aspetta che Kafka sia pronto
+    # Wait for Kafka to be ready
     echo "Waiting for Kafka to be ready..."
     sleep 30
     
-    # Crea il topic
+    # Create the topic
     docker-compose exec kafka kafka-topics --create --topic web-logs --bootstrap-server localhost:29092 --replication-factor 1 --partitions 3
     
     echo "Kafka setup completed."
@@ -106,11 +106,11 @@ else
 fi
 
 echo "Environment setup completed."
-echo ""
+
 echo "Next steps:"
 echo "1. Start log generation: python3 log_generator.py --rate 10"
 echo "2. Start streaming processing: python3 streaming_processor.py --mode stream"
 echo "3. Run analytics: python3 streaming_processor.py --mode analytics"
 echo "4. Start anomaly detection: python3 anomaly_detector.py --mode detect"
-echo ""
+
 echo "Monitor Kafka: http://localhost:8080"

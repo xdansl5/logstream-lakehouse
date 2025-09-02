@@ -304,7 +304,7 @@ class MLLogProcessor:
         
         # --- BEGIN STREAM SINKS ---
 
-        # 1. Aggiungi uno stream di output sulla console per il monitoraggio in tempo reale
+        # 1. Add a console sink for real-time monitoring
         console_query = final_df \
             .select("timestamp", "ip", "endpoint", "is_anomaly", "anomaly_type", "ml_confidence", "detection_method") \
             .writeStream \

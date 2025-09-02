@@ -82,7 +82,7 @@ npm install
 cp .env.example .env
 ```
 
-Modifica il file `.env` con le tue configurazioni:
+Edit the `.env` file with your configuration:
 ```env
 # API Configuration
 VITE_API_URL=http://localhost:4000
@@ -115,7 +115,7 @@ npm run dev
 ### 1. Setup Kafka
 Ensure Kafka is running and the `web-logs` topic exists:
 ```bash
-# Crea il topic se non esiste
+# Create the topic if it does not exist
 kafka-topics.sh --create --topic web-logs --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 ```
 
@@ -132,7 +132,7 @@ spark-submit --packages io.delta:delta-core_2.12:2.4.0 \
 To test the platform, you can generate test logs to be processed by the pipeline:
 
 ```python
-# Esempio di script Python per generare log
+# Example Python script to generate logs
 import json
 import time
 import random
