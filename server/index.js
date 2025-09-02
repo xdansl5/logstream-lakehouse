@@ -287,7 +287,7 @@ async function startKafka() {
 	await kafkaConsumer.connect();
 	await kafkaConsumer.subscribe({ topic: KAFKA_TOPIC, fromBeginning: false });
 
-	console.log(`✅ Kafka consumer connected. Topic: ${KAFKA_TOPIC}, Brokers: ${KAFKA_BROKERS.join(',')}`);
+	console.log(`Kafka consumer connected. Topic: ${KAFKA_TOPIC}, Brokers: ${KAFKA_BROKERS.join(',')}`);
 
 	await kafkaConsumer.run({
 		eachMessage: async ({ message, partition, topic }) => {
@@ -310,8 +310,8 @@ startKafka().catch((err) => {
 });
 
 app.listen(PORT, () => {
-	console.log(`🟢 SSE server listening on http://localhost:${PORT}`);
-	console.log(`➡️  Stream endpoint: http://localhost:${PORT}/events`);
-	console.log(`📊 Metrics endpoint: http://localhost:${PORT}/api/metrics`);
-	console.log(`🔍 Query endpoint: http://localhost:${PORT}/api/query`);
+	console.log(`SSE server listening on http://localhost:${PORT}`);
+	console.log(`Stream endpoint: http://localhost:${PORT}/events`);
+	console.log(`Metrics endpoint: http://localhost:${PORT}/api/metrics`);
+	console.log(`Query endpoint: http://localhost:${PORT}/api/query`);
 });

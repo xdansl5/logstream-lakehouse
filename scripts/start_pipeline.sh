@@ -5,7 +5,7 @@
 
 set -e
 
-echo "🚀 Starting LogStream Lakehouse Pipeline..."
+echo "Starting LogStream Lakehouse Pipeline..."
 echo "=========================================="
 
 # Colors for output
@@ -151,14 +151,14 @@ start_pipeline() {
 # Show access information
 show_access_info() {
     echo ""
-    echo "🌐 Access Information"
+    echo "Access Information"
     echo "===================="
     echo "Grafana Dashboard: http://localhost:3000 (admin/admin)"
     echo "Kafka UI:         http://localhost:8080"
     echo "Kibana:           http://localhost:5601"
     echo "MLflow:           http://localhost:5000"
     echo ""
-    echo "📊 Pipeline Management"
+    echo "Pipeline Management"
     echo "======================"
     echo "Check Status:     python3 pipeline_orchestrator.py --action status"
     echo "Run Analytics:    python3 pipeline_orchestrator.py --action analytics"

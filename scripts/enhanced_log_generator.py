@@ -190,9 +190,9 @@ class EnhancedLogGenerator:
 
     def generate_logs(self, rate=10, duration=None, include_anomalies=True):
         """Generate logs at specified rate"""
-        logger.info(f"🚀 Starting log generation at {rate} logs/sec")
-        logger.info(f"📊 Topic: {self.topic}")
-        logger.info(f"🔌 Kafka servers: {self.kafka_servers}")
+        logger.info(f"Starting log generation at {rate} logs/sec")
+        logger.info(f"Topic: {self.topic}")
+        logger.info(f"Kafka servers: {self.kafka_servers}")
         
         start_time = time.time()
         log_count = 0
@@ -210,21 +210,21 @@ class EnhancedLogGenerator:
                     log_count += 1
                     
                     if log_count % 100 == 0:
-                        logger.info(f"📝 Generated {log_count} logs")
+                        logger.info(f"Generated {log_count} logs")
                 
                 # Control rate
                 time.sleep(1.0 / rate)
                 
         except KeyboardInterrupt:
-            logger.info("\n🛑 Stopping log generation...")
+            logger.info("\nStopping log generation...")
         
         finally:
             self.producer.close()
-            logger.info(f"✅ Log generation completed. Total logs: {log_count}")
+            logger.info(f"Log generation completed. Total logs: {log_count}")
 
     def generate_training_dataset(self, num_samples=10000, output_file="training_logs.json"):
         """Generate training dataset for ML models"""
-        logger.info(f"📚 Generating training dataset with {num_samples} samples...")
+        logger.info(f"Generating training dataset with {num_samples} samples...")
         
         logs = []
         for i in range(num_samples):
@@ -238,7 +238,7 @@ class EnhancedLogGenerator:
         with open(output_file, 'w') as f:
             json.dump(logs, f, indent=2)
         
-        logger.info(f"✅ Training dataset saved to {output_file}")
+        logger.info(f"Training dataset saved to {output_file}")
         return logs
 
 if __name__ == "__main__":

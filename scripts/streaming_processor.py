@@ -24,7 +24,7 @@ class LogStreamProcessor:
     def __init__(self, app_name="LogStreamProcessor"):
         # Initialize or reuse a shared Spark session via the manager.
         self.spark = get_spark(app_name)
-        print(f"✅ Spark Session initialized: {self.spark.version}")
+        print(f"Spark Session initialized: {self.spark.version}")
 
     # -------------------------------------------------------------------------
     # DEFINE SCHEMA
@@ -104,8 +104,8 @@ class LogStreamProcessor:
                        output_path="/tmp/delta-lake/logs", checkpoint_path="/tmp/checkpoints/logs"):
         """Runs the end-to-end streaming pipeline from Kafka to Delta Lake"""
         
-        print(f"🚀 Starting streaming from Kafka topic: {topic}")
-        print(f"📊 Output Delta Lake path: {output_path}")
+        print(f"Starting streaming from Kafka topic: {topic}")
+        print(f"Output Delta Lake path: {output_path}")
         
         # Define schema for parsing JSON messages
         log_schema = self.define_schema()
@@ -186,15 +186,15 @@ class LogStreamProcessor:
         # Stream runs continuously in micro-batches every 10 seconds.
         # ---------------------------------------------------------------------
         
-        print("✅ Streaming started! Press Ctrl+C to stop...")
+        print("Streaming started. Press Ctrl+C to stop...")
         
         try:
             query.awaitTermination()
         except KeyboardInterrupt:
-            print("\n🛑 Stopping streaming...")
+            print("\nStopping streaming...")
             query.stop()
             stop_spark()
-            print("✅ Streaming stopped")
+            print("Streaming stopped")
 
     # -------------------------------------------------------------------------
     # BATCH ANALYTICS ON DELTA
@@ -254,7 +254,7 @@ class LogStreamProcessor:
     # -------------------------------------------------------------------------
     def optimize_delta_table(self, delta_path="tmp/delta-lake/rule-based-logs"):
         """Optimizes Delta table for performance and storage cleanup"""
-        print(f"🔧 Optimizing Delta table at: {delta_path}")
+        print(f"Optimizing Delta table at: {delta_path}")
         
         # Ensure table exists
         self.spark.sql(f"CREATE TABLE IF NOT EXISTS logs USING DELTA LOCATION '{delta_path}'")
@@ -265,7 +265,7 @@ class LogStreamProcessor:
         # Vacuum old files (retain last 7 days = 168 hours)
         self.spark.sql("VACUUM logs RETAIN 168 HOURS")
         
-        print("✅ Optimization completed")
+        print("Optimization completed")
 
 # -----------------------------------------------------------------------------
 # CLI ENTRY POINT
