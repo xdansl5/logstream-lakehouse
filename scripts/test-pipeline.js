@@ -58,7 +58,7 @@ function generateLogEntry() {
 }
 
 async function testKafkaConnection() {
-  console.log('🔍 Testing Kafka connection...');
+  console.log('Testing Kafka connection...');
   
   const kafka = new Kafka({ 
     clientId: 'pipeline-test', 
@@ -68,17 +68,17 @@ async function testKafkaConnection() {
   try {
     const producer = kafka.producer();
     await producer.connect();
-    console.log('✅ Kafka producer connected successfully');
+    console.log('Kafka producer connected successfully');
     
     // Test topic creation/access
     const admin = kafka.admin();
     await admin.connect();
     
     const topics = await admin.listTopics();
-    console.log('📋 Available topics:', topics);
+    console.log('Available topics:', topics);
     
     if (!topics.includes(KAFKA_TOPIC)) {
-      console.log(`📝 Creating topic: ${KAFKA_TOPIC}`);
+      console.log(`Creating topic: ${KAFKA_TOPIC}`);
       await admin.createTopics({
         topics: [{
           topic: KAFKA_TOPIC,
@@ -86,9 +86,9 @@ async function testKafkaConnection() {
           replicationFactor: 1
         }]
       });
-      console.log(`✅ Topic ${KAFKA_TOPIC} created successfully`);
+      console.log(`Topic ${KAFKA_TOPIC} created successfully`);
     } else {
-      console.log(`✅ Topic ${KAFKA_TOPIC} already exists`);
+      console.log(`Topic ${KAFKA_TOPIC} already exists`);
     }
     
     await admin.disconnect();
@@ -96,13 +96,13 @@ async function testKafkaConnection() {
     
     return true;
   } catch (error) {
-    console.error('❌ Kafka connection failed:', error.message);
+    console.error('Kafka connection failed:', error.message);
     return false;
   }
 }
 
 async function generateTestData(duration = 60) {
-  console.log(`🚀 Generating test data for ${duration} seconds...`);
+  console.log(`Generating test data for ${duration} seconds...`);
   
   const kafka = new Kafka({ 
     clientId: 'pipeline-test', 
@@ -113,7 +113,7 @@ async function generateTestData(duration = 60) {
   
   try {
     await producer.connect();
-    console.log('✅ Producer connected, starting data generation...');
+    console.log('Producer connected, starting data generation...');
     
     const startTime = Date.now();
     const endTime = startTime + (duration * 1000);
@@ -123,7 +123,7 @@ async function generateTestData(duration = 60) {
       if (Date.now() > endTime) {
         clearInterval(interval);
         await producer.disconnect();
-        console.log(`✅ Test data generation completed. Sent ${messageCount} messages.`);
+        console.log(`Test data generation completed. Sent ${messageCount} messages.`);
         return;
       }
       
@@ -138,67 +138,67 @@ async function generateTestData(duration = 60) {
         
         messageCount++;
         if (messageCount % 10 === 0) {
-          console.log(`📊 Sent ${messageCount} messages...`);
+          console.log(`Sent ${messageCount} messages...`);
         }
       } catch (error) {
-        console.error('❌ Error sending message:', error.message);
+        console.error('Error sending message:', error.message);
       }
     }, Math.random() * 1000 + 500); // Random interval between 500-1500ms
     
   } catch (error) {
-    console.error('❌ Failed to generate test data:', error.message);
+    console.error('Failed to generate test data:', error.message);
     await producer.disconnect();
   }
 }
 
 async function testAPIServer() {
-  console.log('🔍 Testing API server...');
+  console.log('Testing API server...');
   
   try {
     const response = await fetch('http://localhost:4000/health');
     const data = await response.json();
     
-    console.log('✅ API server is running');
-    console.log('📊 Server status:', data);
+    console.log('API server is running');
+    console.log('Server status:', data);
     
     return true;
   } catch (error) {
-    console.error('❌ API server test failed:', error.message);
+    console.error('API server test failed:', error.message);
     return false;
   }
 }
 
 async function main() {
-  console.log('🧪 Pipeline Test Suite');
+  console.log('Pipeline Test Suite');
   console.log('======================\n');
   
   // Test Kafka connection
   const kafkaOk = await testKafkaConnection();
   if (!kafkaOk) {
-    console.log('\n❌ Kafka test failed. Please ensure Kafka is running.');
+    console.log('\nKafka test failed. Please ensure Kafka is running.');
     process.exit(1);
   }
   
   // Test API server
   const apiOk = await testAPIServer();
   if (!apiOk) {
-    console.log('\n⚠️  API server not available. Please start the server with: npm run server');
+    console.log('\nAPI server not available. Please start the server with: npm run server');
   }
   
   // Generate test data
   const duration = parseInt(process.argv[2]) || 60;
-  console.log(`\n🎯 Starting test data generation for ${duration} seconds...`);
+  console.log(`\nStarting test data generation for ${duration} seconds...`);
   console.log('Press Ctrl+C to stop early\n');
   
   await generateTestData(duration);
   
-  console.log('\n✅ Pipeline test completed successfully!');
-  console.log('🌐 Open http://localhost:5173 to view the real-time dashboard');
+  console.log('\nPipeline test completed successfully!');
+  console.log('Open http://localhost:5173 to view the real-time dashboard');
 }
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
-  console.log('\n🛑 Test stopped by user');
+  console.log('\nTest stopped by user');
   process.exit(0);
 });
 

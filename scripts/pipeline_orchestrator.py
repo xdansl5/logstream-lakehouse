@@ -72,23 +72,23 @@ class PipelineOrchestrator:
                 with open(config_path, 'r') as f:
                     user_config = json.load(f)
                 default_config.update(user_config)
-                logger.info(f"✅ Loaded configuration from {config_path}")
+                logger.info(f"Loaded configuration from {config_path}")
             except Exception as e:
-                logger.warning(f"⚠️ Error loading config file: {e}, using defaults")
+                logger.warning(f"Error loading config file: {e}, using defaults")
         else:
-            logger.info("📝 No config file found, using default configuration")
+            logger.info("No config file found, using default configuration")
         
         return default_config
 
     def signal_handler(self, signum, frame):
         """Handle shutdown signals"""
-        logger.info(f"🛑 Received signal {signum}, shutting down gracefully...")
+        logger.info(f"Received signal {signum}, shutting down gracefully...")
         self.shutdown()
         sys.exit(0)
 
     def check_services(self):
         """Check if required services are running"""
-        logger.info("🔍 Checking service availability...")
+        logger.info("Checking service availability...")
         
         services_status = {}
         
@@ -115,14 +115,13 @@ class PipelineOrchestrator:
         
         # Log status
         for service, status in services_status.items():
-            status_icon = "✅" if status else "❌"
-            logger.info(f"{status_icon} {service}: {'Running' if status else 'Not available'}")
+            logger.info(f"{service}: {'Running' if status else 'Not available'}")
         
         return services_status
 
     def setup_environment(self):
         """Setup the environment and directories"""
-        logger.info("🔧 Setting up environment...")
+        logger.info("Setting up environment...")
         
         # Create directories
         directories = list({
@@ -137,15 +136,15 @@ class PipelineOrchestrator:
         
         for directory in directories:
             os.makedirs(directory, exist_ok=True)
-            logger.info(f"📁 Created directory: {directory}")
+            logger.info(f"Created directory: {directory}")
 
     def train_ml_models(self):
         """Train ML models for anomaly detection"""
-        logger.info("🔬 Training ML models...")
+        logger.info("Training ML models...")
         
         try:
             # Generate training data first
-            logger.info("📚 Generating training dataset...")
+            logger.info("Generating training dataset...")
             subprocess.run([
                 "python3", os.path.join(self.script_dir, "enhanced_log_generator.py"),
                 "--training-data", str(self.config["ml"]["training_samples"]),
@@ -153,26 +152,26 @@ class PipelineOrchestrator:
             ], check=True)
             
             # Train the model
-            logger.info("🧠 Training anomaly detection model...")
+            logger.info("Training anomaly detection model...")
             subprocess.run([
                 "python3", os.path.join(self.script_dir, "ml_streaming_processor.py"),
                 "--mode", "train",
                 "--training-data", self.config["delta_lake"]["logs_path"]
             ], check=True)
             
-            logger.info("✅ ML model training completed successfully")
+            logger.info("ML model training completed successfully")
             return True
             
         except subprocess.CalledProcessError as e:
-            logger.error(f"❌ ML model training failed: {e}")
+            logger.error(f"ML model training failed: {e}")
             return False
 
     def start_pipeline_components(self):
         """Start all pipeline components"""
-        logger.info("🚀 Starting pipeline components...")
+        logger.info("Starting pipeline components...")
         
         # Start basic streaming processor
-        logger.info("📊 Starting basic streaming processor...")
+        logger.info("Starting basic streaming processor...")
         self.processes["streaming_processor"] = subprocess.Popen([
             "python3", os.path.join(self.script_dir, "streaming_processor.py"),
             "--mode", "stream",
@@ -186,7 +185,7 @@ class PipelineOrchestrator:
         time.sleep(10)
         
         # Start ML streaming processor
-        logger.info("🤖 Starting ML streaming processor...")
+        logger.info("Starting ML streaming processor...")
         elasticsearch_host = self.config["elasticsearch"]["host"] if self.config["elasticsearch"]["enabled"] else "none"
         self.processes["ml_processor"] = subprocess.Popen([
             "python3", os.path.join(self.script_dir, "ml_streaming_processor.py"),
@@ -203,7 +202,7 @@ class PipelineOrchestrator:
         time.sleep(10)
         
         # Start anomaly detector
-        logger.info("🚨 Starting anomaly detector...")
+        logger.info("Starting anomaly detector...")
         self.processes["anomaly_detector"] = subprocess.Popen([
             "python3", os.path.join(self.script_dir, "anomaly_detector.py"),
             "--mode", "detect",
@@ -212,11 +211,11 @@ class PipelineOrchestrator:
             "--checkpoint-path", self.config["checkpoints"]["anomalies"]
         ])
         
-        logger.info("✅ All pipeline components started")
+        logger.info("All pipeline components started")
 
     def start_log_generation(self):
         """Start log generation for testing"""
-        logger.info("📝 Starting log generation...")
+        logger.info("Starting log generation...")
         
         self.processes["log_generator"] = subprocess.Popen([
             "python3", os.path.join(self.script_dir, "enhanced_log_generator.py"),
@@ -225,18 +224,18 @@ class PipelineOrchestrator:
             "--rate", "20"
         ])
         
-        logger.info("✅ Log generation started")
+        logger.info("Log generation started")
 
     def monitor_pipeline(self):
         """Monitor pipeline health and performance"""
-        logger.info("📊 Starting pipeline monitoring...")
+        logger.info("Starting pipeline monitoring...")
         
         try:
             while self.running:
                 # Check process health
                 for name, process in self.processes.items():
                     if process.poll() is not None:
-                        logger.error(f"❌ Process {name} has stopped unexpectedly")
+                        logger.error(f"Process {name} has stopped unexpectedly")
                         # Restart the process
                         self.restart_process(name)
                 
@@ -247,11 +246,11 @@ class PipelineOrchestrator:
                 time.sleep(5)
                 
         except KeyboardInterrupt:
-            logger.info("🛑 Monitoring interrupted")
+            logger.info("Monitoring interrupted")
 
     def restart_process(self, process_name):
         """Restart a failed process"""
-        logger.info(f"🔄 Restarting {process_name}...")
+        logger.info(f"Restarting {process_name}...")
         
         if process_name in self.processes:
             self.processes[process_name].terminate()
@@ -288,11 +287,11 @@ class PipelineOrchestrator:
                     "--checkpoint-path", self.config["checkpoints"]["anomalies"]
                 ])
             
-            logger.info(f"✅ {process_name} restarted")
+            logger.info(f"{process_name} restarted")
 
     def run_analytics(self):
         """Run analytics on the processed data"""
-        logger.info("📈 Running analytics...")
+        logger.info("Running analytics...")
         
         try:
             # Run basic analytics
@@ -316,14 +315,14 @@ class PipelineOrchestrator:
                 "--output-path", self.config["delta_lake"]["anomalies_path"]
             ], check=True)
             
-            logger.info("✅ Analytics completed successfully")
+            logger.info("Analytics completed successfully")
             
         except subprocess.CalledProcessError as e:
-            logger.error(f"❌ Analytics failed: {e}")
+            logger.error(f"Analytics failed: {e}")
 
     def start_pipeline(self):
         """Start the complete pipeline"""
-        logger.info("🚀 Starting LogStream Lakehouse Pipeline...")
+        logger.info("Starting LogStream Lakehouse Pipeline...")
         
         # Setup environment
         self.setup_environment()
@@ -336,9 +335,9 @@ class PipelineOrchestrator:
         
         # Train ML models if needed
         if not os.path.exists("ml_models"):
-            logger.info("🤖 No ML models found, starting training...")
+            logger.info("No ML models found, starting training...")
             if not self.train_ml_models():
-                logger.error("❌ ML model training failed")
+                logger.error("ML model training failed")
                 return False
         
         # Start pipeline components
@@ -357,36 +356,36 @@ class PipelineOrchestrator:
 
     def shutdown(self):
         """Shutdown the pipeline gracefully"""
-        logger.info("🛑 Shutting down pipeline...")
+        logger.info("Shutting down pipeline...")
         
         self.running = False
         
         # Stop all processes
         for name, process in self.processes.items():
-            logger.info(f"🛑 Stopping {name}...")
+            logger.info(f"Stopping {name}...")
             try:
                 process.terminate()
                 process.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                logger.warning(f"⚠️ Force killing {name}")
+                logger.warning(f"Force killing {name}")
                 process.kill()
         
-        logger.info("✅ Pipeline shutdown completed")
+        logger.info("Pipeline shutdown completed")
 
     def show_status(self):
         """Show current pipeline status"""
-        logger.info("📊 Pipeline Status:")
+        logger.info("Pipeline Status:")
         
         # Check services
         services_status = self.check_services()
         
         # Check processes
         for name, process in self.processes.items():
-            status = "🟢 Running" if process.poll() is None else "🔴 Stopped"
+            status = "Running" if process.poll() is None else "Stopped"
             logger.info(f"  {name}: {status}")
         
         # Show URLs
-        logger.info("\n🌐 Access URLs:")
+        logger.info("\nAccess URLs:")
         logger.info(f"  Grafana: {self.config['monitoring']['grafana_url']}")
         logger.info(f"  Kafka UI: {self.config['monitoring']['kafka_ui_url']}")
         logger.info(f"  Kibana: {self.config['monitoring']['kibana_url']}")

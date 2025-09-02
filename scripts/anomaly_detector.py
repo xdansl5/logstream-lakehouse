@@ -67,9 +67,9 @@ class AnomalyDetector:
                                checkpoint_path="/tmp/checkpoints/anomalies"):
         """Start real-time anomaly detection and output results"""
         
-        print(f"🔍 Starting anomaly detection...")
-        print(f"📊 Input stream: {delta_path}")
-        print(f"🚨 Anomalies output: {output_path}")
+        print(f"Starting anomaly detection...")
+        print(f"Input stream: {delta_path}")
+        print(f"Anomalies output: {output_path}")
         
         anomalies_stream = self.detect_traffic_anomalies(delta_path)
         
@@ -92,7 +92,7 @@ class AnomalyDetector:
             .trigger(processingTime='30 seconds') \
             .start()
         
-        print("✅ Anomaly detection started!")
+        print("Anomaly detection started.")
 
         def _graceful_shutdown(*_args):
             try:
@@ -107,7 +107,7 @@ class AnomalyDetector:
         try:
             query.awaitTermination()
         except KeyboardInterrupt:
-            print("\n🛑 Stopping anomaly detection...")
+            print("\nStopping anomaly detection...")
             try:
                 query.stop()
                 console_query.stop()

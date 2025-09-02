@@ -1,6 +1,6 @@
 # Real-Time Data Pipeline Platform
 
-An interactive web platform to monitor and analyze real-time data from the Kafka → Spark Streaming → Delta Lake pipeline.
+An interactive platform to ingest, process, and analyze real-time web logs using Kafka, Spark Structured Streaming, and Delta Lake. The repository includes scripts to run the end-to-end pipeline, optional ML-based anomaly detection, and a simple server for UI streaming.
 
 ## 🚀 Key Features
 
@@ -36,7 +36,7 @@ An interactive web platform to monitor and analyze real-time data from the Kafka
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-## 🛠️ Technologies
+## Technologies
 
 ### Frontend
 - **React 18** with TypeScript
@@ -58,7 +58,7 @@ An interactive web platform to monitor and analyze real-time data from the Kafka
 - **Delta Lake** for storage
 - **Spark SQL** for querying
 
-## 📦 Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 - Node.js 18+ and npm
@@ -66,23 +66,23 @@ An interactive web platform to monitor and analyze real-time data from the Kafka
 - Apache Spark (running on localhost:7077)
 - Delta Lake tables configured
 
-### 1. Clone the Repository
+### 1. Clone the repository
 ```bash
 git clone <YOUR_REPO_URL>
 cd data-pipeline-platform
 ```
 
-### 2. Install Dependencies
+### 2. Install dependencies
 ```bash
 npm install
 ```
 
-### 3. Configure Environment Variables
+### 3. Configure environment variables
 ```bash
 cp .env.example .env
 ```
 
-Modifica il file `.env` con le tue configurazioni:
+Edit the `.env` file with your configuration:
 ```env
 # API Configuration
 VITE_API_URL=http://localhost:4000
@@ -100,22 +100,22 @@ DELTA_LAKE_PATH=/tmp/delta-lake
 PORT=4000
 ```
 
-### 4. Start the Backend Server
+### 4. Start the backend server (optional)
 ```bash
 npm run server
 ```
 
-### 5. Start the Frontend App
+### 5. Start the frontend app (optional)
 ```bash
 npm run dev
 ```
 
-## 🔧 Pipeline Configuration
+## Pipeline configuration
 
 ### 1. Setup Kafka
 Ensure Kafka is running and the `web-logs` topic exists:
 ```bash
-# Crea il topic se non esiste
+# Create the topic if it does not exist
 kafka-topics.sh --create --topic web-logs --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 ```
 
@@ -128,11 +128,11 @@ spark-submit --packages io.delta:delta-core_2.12:2.4.0 \
   your-spark-job.py
 ```
 
-### 3. Test Log Generation
+### 3. Test log generation
 To test the platform, you can generate test logs to be processed by the pipeline:
 
 ```python
-# Esempio di script Python per generare log
+# Example Python script to generate logs
 import json
 import time
 import random
@@ -162,7 +162,74 @@ while True:
     time.sleep(random.uniform(0.1, 2.0))
 ```
 
-## 🎯 Platform Usage
+## Pipeline usage
+
+### A. Quick start (recommended)
+
+From the `scripts` directory:
+
+```bash
+pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
+./setup_environment.sh
+python3 pipeline_orchestrator.py --action start
+```
+
+This will:
+- Start Kafka services with Docker Compose
+- Create Delta/Checkpoint directories
+- Train an anomaly detection model if not present
+- Start the streaming processor, ML streaming processor, and anomaly detector
+- Start the test log generator
+
+To stop:
+```bash
+python3 pipeline_orchestrator.py --action stop
+```
+
+### B. Run components individually
+
+In `scripts/`:
+
+```bash
+# 1) Generate logs
+python3 enhanced_log_generator.py --rate 10
+
+# 2) Start rule-based streaming
+python3 streaming_processor.py --mode stream --output-path /tmp/delta-lake/rule-based-logs --checkpoint-path /tmp/checkpoints/logs
+
+# 3) Start ML streaming (writes predictions separately)
+python3 ml_streaming_processor.py --mode stream --output-path /tmp/delta-lake/rule-based-logs --ml-output-path /tmp/delta-lake/ml-predictions --checkpoint-path /tmp/checkpoints/logs
+
+# 4) Start anomaly detection
+python3 anomaly_detector.py --mode detect --input-path /tmp/delta-lake/rule-based-logs --output-path /tmp/delta-lake/anomalies --checkpoint-path /tmp/checkpoints/anomalies
+```
+
+### C. Analytics and maintenance
+
+```bash
+# Batch analytics on rule-based logs
+python3 streaming_processor.py --mode analytics --output-path /tmp/delta-lake/rule-based-logs
+
+# ML analytics on predictions
+python3 ml_streaming_processor.py --mode analytics --output-path /tmp/delta-lake/ml-predictions
+
+# Analyze historical anomalies
+python3 anomaly_detector.py --mode analyze --output-path /tmp/delta-lake/anomalies
+
+# Optional: delta optimization
+python3 streaming_processor.py --mode optimize --output-path /tmp/delta-lake/rule-based-logs
+```
+
+### D. Spark configuration and ports
+
+The scripts use a shared Spark session per process to avoid multiple SparkContext errors and disable the Spark UI by default. You can override with:
+
+```bash
+SPARK_UI_ENABLED=true SPARK_UI_PORT=4040 python3 streaming_processor.py --mode stream
+```
+
+You can also increase port retries via `SPARK_PORT_MAX_RETRIES=64` and set `SPARK_LOCAL_IP`.
 
 ### 1. Main Dashboard
 - **Metrics Grid**: Real-time metrics (events/sec, error rate, response time, etc.)
@@ -179,7 +246,7 @@ while True:
 - **Anomaly Detection**: Automatic error and anomaly detection
 - **Performance Metrics**: Real-time performance monitoring
 
-## 🔍 Sample Queries
+## Sample queries
 
 ### Analisi Errori
 ```sql
@@ -219,7 +286,7 @@ GROUP BY endpoint, source, level
 ORDER BY anomaly_count DESC
 ```
 
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### Connectivity Issues
 1. **Kafka unreachable**: Ensure Kafka runs on localhost:9092
@@ -231,7 +298,7 @@ ORDER BY anomaly_count DESC
 - Verify SSE: `curl http://localhost:4000/health`
 - Test APIs: `curl http://localhost:4000/api/metrics`
 
-## 📈 Metrics and Performance
+## Metrics and performance
 
 The platform monitors in real-time:
 - **Throughput**: Events processed per second
@@ -240,7 +307,7 @@ The platform monitors in real-time:
 - **Active Sessions**: Active user sessions
 - **Data Processed**: Volume processed
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
@@ -248,11 +315,11 @@ The platform monitors in real-time:
 4. Push the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License. See `LICENSE` for details.
 
-## 🆘 Support
+## Support
 
 For support and questions:
 - Open a GitHub issue
