@@ -196,20 +196,20 @@ In `scripts/`:
 python3 enhanced_log_generator.py --rate 10
 
 # 2) Start rule-based streaming
-python3 streaming_processor.py --mode stream --output-path /tmp/delta-lake/rule-based-logs --checkpoint-path /tmp/checkpoints/logs
+python3 streaming_processor.py --mode stream --output-path /tmp/delta-lake/logs --checkpoint-path /tmp/checkpoints/logs
 
 # 3) Start ML streaming (writes predictions separately)
-python3 ml_streaming_processor.py --mode stream --output-path /tmp/delta-lake/rule-based-logs --ml-output-path /tmp/delta-lake/ml-predictions --checkpoint-path /tmp/checkpoints/logs
+python3 ml_streaming_processor.py --mode stream --output-path /tmp/delta-lake/logs --ml-output-path /tmp/delta-lake/ml-predictions --checkpoint-path /tmp/checkpoints/logs
 
 # 4) Start anomaly detection
-python3 anomaly_detector.py --mode detect --input-path /tmp/delta-lake/rule-based-logs --output-path /tmp/delta-lake/anomalies --checkpoint-path /tmp/checkpoints/anomalies
+python3 anomaly_detector.py --mode detect --input-path /tmp/delta-lake/logs --output-path /tmp/delta-lake/anomalies --checkpoint-path /tmp/checkpoints/anomalies
 ```
 
 ### C. Analytics and maintenance
 
 ```bash
 # Batch analytics on rule-based logs
-python3 streaming_processor.py --mode analytics --output-path /tmp/delta-lake/rule-based-logs
+python3 streaming_processor.py --mode analytics --output-path /tmp/delta-lake/logs
 
 # ML analytics on predictions
 python3 ml_streaming_processor.py --mode analytics --output-path /tmp/delta-lake/ml-predictions
@@ -218,7 +218,7 @@ python3 ml_streaming_processor.py --mode analytics --output-path /tmp/delta-lake
 python3 anomaly_detector.py --mode analyze --output-path /tmp/delta-lake/anomalies
 
 # Optional: delta optimization
-python3 streaming_processor.py --mode optimize --output-path /tmp/delta-lake/rule-based-logs
+python3 streaming_processor.py --mode optimize --output-path /tmp/delta-lake/logs
 ```
 
 ### D. Spark configuration and ports
@@ -248,7 +248,7 @@ You can also increase port retries via `SPARK_PORT_MAX_RETRIES=64` and set `SPAR
 
 ## Sample queries
 
-### Analisi Errori
+### Error Analysis
 ```sql
 SELECT endpoint, count(*) as error_count,
        avg(response_time) as avg_response_time
@@ -259,7 +259,7 @@ ORDER BY error_count DESC
 LIMIT 5
 ```
 
-### Analisi Sessioni Utente
+### User Session Analysis
 ```sql
 SELECT 
   user_id,
@@ -273,7 +273,7 @@ ORDER BY page_views DESC
 LIMIT 10
 ```
 
-### Rilevamento Anomalie
+### Anomaly Detection
 ```sql
 SELECT 
   endpoint, source, level,
