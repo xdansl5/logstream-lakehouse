@@ -16,7 +16,6 @@ from spark_session_manager import get_spark, stop_spark
 # CLI argument parser
 import argparse
 import os
-
 # -----------------------------------------------------------------------------
 # MAIN PROCESSING CLASS
 # -----------------------------------------------------------------------------
@@ -252,7 +251,7 @@ class LogStreamProcessor:
     # -------------------------------------------------------------------------
     # DELTA TABLE OPTIMIZATION
     # -------------------------------------------------------------------------
-    def optimize_delta_table(self, delta_path="tmp/delta-lake/rule-based-logs"):
+    def optimize_delta_table(self, delta_path="tmp/delta-lake/logs"):
         """Optimizes Delta table for performance and storage cleanup"""
         print(f"Optimizing Delta table at: {delta_path}")
         
@@ -276,7 +275,7 @@ if __name__ == "__main__":
                        default='stream', help='Execution mode')
     parser.add_argument('--kafka-servers', default='localhost:9092', help='Kafka bootstrap servers')
     parser.add_argument('--topic', default='web-logs', help='Kafka topic')
-    parser.add_argument('--output-path', default='/tmp/delta-lake/rule-based-logs', help='Delta Lake output path')
+    parser.add_argument('--output-path', default='/tmp/delta-lake/logs', help='Delta Lake output path')
     parser.add_argument('--checkpoint-path', default='/tmp/checkpoints/logs', help='Checkpoint location')
     parser.add_argument('--spark-ui', default='false', help='Enable Spark UI (true/false)')
     parser.add_argument('--spark-ui-port', default=None, help='Spark UI port (optional)')
@@ -303,3 +302,8 @@ if __name__ == "__main__":
         processor.run_batch_analytics(args.output_path)
     elif args.mode == 'optimize':
         processor.optimize_delta_table(args.output_path)
+
+    try:
+        processor = LogStreamProcessor()
+    finally:
+        stop_spark()

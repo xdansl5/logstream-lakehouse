@@ -38,9 +38,9 @@ class PipelineOrchestrator:
                 "topic": "web-logs"
             },
             "delta_lake": {
-                "logs_path": "/tmp/delta-lake/rule-based-logs",
+                "logs_path": "/tmp/delta-lake/logs",
                 "anomalies_path": "/tmp/delta-lake/anomalies",
-                "ml_enriched_path": "/tmp/delta-lake/rule-based-logs",
+                "ml_enriched_path": "/tmp/delta-lake/logs",
                 "ml_predictions_path": "/tmp/delta-lake/ml-predictions"
             },
             "checkpoints": {

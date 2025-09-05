@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { Kafka } = require('kafkajs');
+import { Kafka } from 'kafkajs';
 
 // Configuration
 const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');

@@ -17,10 +17,9 @@ class AnomalyDetector:
         # Initialize or reuse shared Spark session
         self.spark = get_spark(app_name)
 
-    def detect_traffic_anomalies(self, delta_path="/tmp/delta-lake/rule-based-logs"):
+    def detect_traffic_anomalies(self, delta_path="/tmp/delta-lake/logs"):
         """Detect traffic anomalies using windowed aggregations"""
         
-        # Read streaming logs from Delta Lake table
         logs_stream = self.spark \
             .readStream \
             .format("delta") \
@@ -62,7 +61,7 @@ class AnomalyDetector:
         
         return anomalies
 
-    def start_anomaly_detection(self, delta_path="/tmp/delta-lake/rule-based-logs", 
+    def start_anomaly_detection(self, delta_path="/tmp/delta-lake/logs", 
                                output_path="/tmp/delta-lake/anomalies",
                                checkpoint_path="/tmp/checkpoints/anomalies"):
         """Start real-time anomaly detection and output results"""
@@ -73,7 +72,7 @@ class AnomalyDetector:
         
         anomalies_stream = self.detect_traffic_anomalies(delta_path)
         
-        # Write anomalies back to Delta Lake for persistence
+
         query = anomalies_stream \
             .writeStream \
             .format("delta") \
@@ -83,7 +82,6 @@ class AnomalyDetector:
             .trigger(processingTime='30 seconds') \
             .start()
         
-        # Additionally, output anomalies to console for debugging
         console_query = anomalies_stream \
             .writeStream \
             .outputMode("append") \
@@ -119,7 +117,6 @@ class AnomalyDetector:
         
         print("📈 Analyzing historical anomalies...")
         
-        # Load anomalies from Delta Lake
         anomalies_df = self.spark.read.format("delta").load(anomalies_path)
         anomalies_df.createOrReplaceTempView("anomalies")
         
@@ -154,7 +151,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Anomaly detection for log streams')
     parser.add_argument('--mode', choices=['detect', 'analyze'], 
                        default='detect', help='Execution mode')
-    parser.add_argument('--input-path', default='/tmp/delta-lake/rule-based-logs', help='Input Delta Lake path')
+    parser.add_argument('--input-path', default='/tmp/delta-lake/logs', help='Input Delta Lake path')
     parser.add_argument('--output-path', default='/tmp/delta-lake/anomalies', help='Output path for anomalies')
     parser.add_argument('--checkpoint-path', default='/tmp/checkpoints/anomalies', help='Checkpoint location')
     

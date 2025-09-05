@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Enhanced Log Generator for ML Training
+Log Generator for ML Training
 Generates realistic web application logs with additional ML features
 """
 
@@ -12,11 +12,13 @@ from datetime import datetime, timedelta
 from kafka import KafkaProducer
 import logging
 
+
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class EnhancedLogGenerator:
+class LogGenerator:
     def __init__(self, kafka_servers="localhost:9092", topic="web-logs"):
         self.kafka_servers = kafka_servers
         self.topic = topic
@@ -26,7 +28,7 @@ class EnhancedLogGenerator:
             key_serializer=lambda k: k.encode('utf-8') if k else None
         )
         
-        # Enhanced endpoint patterns with realistic traffic distribution
+        # Endpoint patterns with realistic traffic distribution
         self.endpoints = {
             "/api/users": {"weight": 0.3, "methods": ["GET", "POST", "PUT", "DELETE"]},
             "/api/products": {"weight": 0.25, "methods": ["GET", "POST", "PUT", "DELETE"]},
@@ -242,7 +244,7 @@ class EnhancedLogGenerator:
         return logs
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Enhanced log generator for ML training')
+    parser = argparse.ArgumentParser(description='Log generator for ML training')
     parser.add_argument('--kafka-servers', default='localhost:9092', help='Kafka bootstrap servers')
     parser.add_argument('--topic', default='web-logs', help='Kafka topic')
     parser.add_argument('--rate', type=int, default=10, help='Logs per second')
@@ -253,7 +255,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    generator = EnhancedLogGenerator(args.kafka_servers, args.topic)
+    generator = LogGenerator(args.kafka_servers, args.topic)
     
     if args.training_data:
         generator.generate_training_dataset(args.training_data, args.output_file)
@@ -263,3 +265,5 @@ if __name__ == "__main__":
             duration=args.duration,
             include_anomalies=not args.no_anomalies
         )
+    
+    
