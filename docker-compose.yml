@@ -55,59 +55,7 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
 
-  # Elasticsearch
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-    container_name: elasticsearch
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
-      - cluster.name=logstream-cluster
-      - node.name=logstream-node
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    volumes:
-      - elasticsearch-data:/usr/share/elasticsearch/data
-    ports:
-      - "9200:9200"
-      - "9300:9300"
-    networks:
-      - logstream-network
-
-  # Kibana
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.11.0
-    container_name: kibana
-    depends_on:
-      - elasticsearch
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    ports:
-      - "5601:5601"
-    networks:
-      - logstream-network
-
-  # Grafana
-  grafana:
-    image: grafana/grafana:10.2.0
-    container_name: grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
-    networks:
-      - logstream-network
-
-  # Redis for caching (optional)
+  # Redis for caching
   redis:
     image: redis:7.2-alpine
     container_name: redis
@@ -118,7 +66,7 @@ services:
     networks:
       - logstream-network
 
-  # MLflow for model tracking (optional)
+  # MLflow for model tracking 
   mlflow:
     image: ghcr.io/mlflow/mlflow:latest
     container_name: mlflow
@@ -137,8 +85,6 @@ volumes:
   zookeeper-data:
   zookeeper-logs:
   kafka-data:
-  elasticsearch-data:
-  grafana-data:
   redis-data:
   mlflow-data:
 

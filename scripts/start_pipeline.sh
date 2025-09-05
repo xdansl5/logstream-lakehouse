@@ -77,20 +77,6 @@ start_services() {
     else
         print_warning "Kafka might still be starting up..."
     fi
-    
-    # Check Elasticsearch
-    if curl -s http://localhost:9200/_cluster/health > /dev/null; then
-        print_success "Elasticsearch is ready"
-    else
-        print_warning "Elasticsearch might still be starting up..."
-    fi
-    
-    # Check Grafana
-    if curl -s http://localhost:3000/api/health > /dev/null; then
-        print_success "Grafana is ready"
-    else
-        print_warning "Grafana might still be starting up..."
-    fi
 }
 
 # Setup Python environment
@@ -153,9 +139,7 @@ show_access_info() {
     echo ""
     echo "Access Information"
     echo "===================="
-    echo "Grafana Dashboard: http://localhost:3000 (admin/admin)"
     echo "Kafka UI:         http://localhost:8080"
-    echo "Kibana:           http://localhost:5601"
     echo "MLflow:           http://localhost:5000"
     echo ""
     echo "Pipeline Management"

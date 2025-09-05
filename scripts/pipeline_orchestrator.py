@@ -48,18 +48,12 @@ class PipelineOrchestrator:
                 "anomalies": "/tmp/checkpoints/anomalies",
                 "ml_logs": "/tmp/checkpoints/ml-logs"
             },
-            "elasticsearch": {
-                "host": "localhost:9200",
-                "enabled": True
-            },
             "ml": {
                 "training_samples": 10000,
                 "retrain_interval_hours": 24
             },
             "monitoring": {
-                "grafana_url": "http://localhost:3000",
-                "kafka_ui_url": "http://localhost:8080",
-                "kibana_url": "http://localhost:5601"
+                "kafka_ui_url": "http://localhost:8080"
             }
         }
         
@@ -98,20 +92,6 @@ class PipelineOrchestrator:
             services_status["kafka"] = response.status_code == 200
         except:
             services_status["kafka"] = False
-        
-        # Check Elasticsearch
-        try:
-            response = requests.get(f"{self.config['elasticsearch']['host']}/_cluster/health", timeout=5)
-            services_status["elasticsearch"] = response.status_code == 200
-        except:
-            services_status["elasticsearch"] = False
-        
-        # Check Grafana
-        try:
-            response = requests.get(f"{self.config['monitoring']['grafana_url']}/api/health", timeout=5)
-            services_status["grafana"] = response.status_code == 200
-        except:
-            services_status["grafana"] = False
         
         # Log status
         for service, status in services_status.items():
@@ -186,7 +166,6 @@ class PipelineOrchestrator:
         
         # Start ML streaming processor
         logger.info("Starting ML streaming processor...")
-        elasticsearch_host = self.config["elasticsearch"]["host"] if self.config["elasticsearch"]["enabled"] else "none"
         self.processes["ml_processor"] = subprocess.Popen([
             "python3", os.path.join(self.script_dir, "ml_streaming_processor.py"),
             "--mode", "stream",
@@ -194,8 +173,7 @@ class PipelineOrchestrator:
             "--topic", self.config["kafka"]["topic"],
             "--output-path", self.config["delta_lake"]["logs_path"],
             "--ml-output-path", self.config["delta_lake"].get("ml_predictions_path", "/tmp/delta-lake/ml-predictions"),
-            "--checkpoint-path", self.config["checkpoints"]["ml_logs"],
-            "--elasticsearch-host", elasticsearch_host
+            "--checkpoint-path", self.config["checkpoints"]["ml_logs"]
         ])
         
         # Wait a bit for the ML processor to start
@@ -267,7 +245,6 @@ class PipelineOrchestrator:
                     "--checkpoint-path", self.config["checkpoints"]["logs"]
                 ])
             elif process_name == "ml_processor":
-                elasticsearch_host = self.config["elasticsearch"]["host"] if self.config["elasticsearch"]["enabled"] else "none"
                 self.processes[process_name] = subprocess.Popen([
                     "python3", os.path.join(self.script_dir, "ml_streaming_processor.py"),
                     "--mode", "stream",
@@ -275,8 +252,7 @@ class PipelineOrchestrator:
                     "--topic", self.config["kafka"]["topic"],
                     "--output-path", self.config["delta_lake"]["logs_path"],
                     "--ml-output-path", self.config["delta_lake"].get("ml_predictions_path", "/tmp/delta-lake/ml-predictions"),
-                    "--checkpoint-path", self.config["checkpoints"]["ml_logs"],
-                    "--elasticsearch-host", elasticsearch_host
+                    "--checkpoint-path", self.config["checkpoints"]["ml_logs"]
                 ])
             elif process_name == "anomaly_detector":
                 self.processes[process_name] = subprocess.Popen([
@@ -386,10 +362,7 @@ class PipelineOrchestrator:
         
         # Show URLs
         logger.info("\nAccess URLs:")
-        logger.info(f"  Grafana: {self.config['monitoring']['grafana_url']}")
         logger.info(f"  Kafka UI: {self.config['monitoring']['kafka_ui_url']}")
-        logger.info(f"  Kibana: {self.config['monitoring']['kibana_url']}")
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='LogStream Lakehouse Pipeline Orchestrator')
     parser.add_argument('--action', choices=['start', 'stop', 'status', 'analytics', 'train'], 
