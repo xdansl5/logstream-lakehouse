@@ -22,18 +22,25 @@ An interactive platform to ingest, process, and analyze real-time web logs using
 - **Advanced Filters**: Filter logs by level, source, endpoint
 - **Anomaly Detection**: Automatic anomaly detection on data
 
-## 🏗️ Architecture
+## Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Web Logs      │───▶│     Kafka       │───▶│  Spark Streaming│
-│   (Sources)     │    │   (Broker)      │    │   (Processing)  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                                       │
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Web Platform  │◀───│   API Server    │◀───│   Delta Lake    │
-│   (React App)   │    │   (Express)     │    │   (Storage)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+          Web Logs (Sources)
+                  |
+                  v
+              Kafka (Broker)
+                  |
+                  v
+        Spark Streaming (Processing)
+                  |
+                  v
+           Delta Lake (Storage)
+                  |
+                  v
+         API Server (Express)
+                  |
+                  v
+       Web Platform (React App)
 ```
 
 ## Technologies
