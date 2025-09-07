@@ -1,7 +1,3 @@
-Ecco la versione compatta e integrata del tuo README. Ho inserito le informazioni sul setup di Docker e il funzionamento degli script `setup_environment.sh` e `start_pipeline.sh` nella sezione **Pipeline configuration and usage**, rendendola più completa e autonoma.
-
------
-
 # Real-Time Data Pipeline Platform
 
 An interactive platform to ingest, process, and analyze real-time web logs using Kafka, Spark Structured Streaming, and Delta Lake. The repository includes scripts to run the end-to-end pipeline, optional ML-based anomaly detection, and a simple server for UI streaming.
