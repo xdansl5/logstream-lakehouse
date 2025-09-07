@@ -52,13 +52,7 @@ An interactive platform to ingest, process, and analyze real-time web logs using
 
 ## Singleton Spark Session
 
-To ensure stable Spark execution, the platform uses a singleton pattern for managing Spark sessions. This avoids creating multiple SparkContext instances within the same JVM, which would otherwise trigger the common Spark error “Only one SparkContext may be running in this JVM (SPARK-2243)”.
-
-The shared session logic is implemented in `spark_session_manager.py`. All components of the pipeline (streaming processor, ML processor, anomaly detector, and analytics jobs) import the `get_spark()` function to obtain the same SparkSession instance.
-
-This ensures efficient resource use, stable execution, and consistent Delta Lake + Kafka configuration across jobs.
-
-Spark configuration options such as `SPARK_UI_ENABLED`, `SPARK_UI_PORT`, `SPARK_PORT_MAX_RETRIES`, and `SPARK_LOCAL_IP` can be set via environment variables for flexible runtime behavior.
+The platform manages Spark with a singleton SparkSession (see spark_session_manager.py) to avoid multiple SparkContext errors (SPARK-2243). All pipeline components (get_spark()) share the same session, ensuring efficient resource use, stable execution, and consistent Delta Lake + Kafka settings. Spark configs (SPARK_UI_ENABLED, SPARK_UI_PORT, SPARK_PORT_MAX_RETRIES, SPARK_LOCAL_IP) can be set via environment variables.
 
 Example usage:
 
