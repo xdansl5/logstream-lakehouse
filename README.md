@@ -52,7 +52,12 @@ An interactive platform to ingest, process, and analyze real-time web logs using
 
 ## Singleton Spark Session
 
-The platform manages Spark with a singleton SparkSession (see spark_session_manager.py) to avoid multiple SparkContext errors (SPARK-2243). All pipeline components (get_spark()) share the same session, ensuring efficient resource use, stable execution, and consistent Delta Lake + Kafka settings. Spark configs (SPARK_UI_ENABLED, SPARK_UI_PORT, SPARK_PORT_MAX_RETRIES, SPARK_LOCAL_IP) can be set via environment variables.
+The platform manages Spark with a singleton `SparkSession` (see `spark_session_manager.py`) to avoid multiple `SparkContext` errors (SPARK-2243).  
+
+All pipeline components use `get_spark()` to share the same session, ensuring efficient resource use, stable execution, and consistent Delta Lake + Kafka settings.  
+
+Spark configuration options like `SPARK_UI_ENABLED`, `SPARK_UI_PORT`, `SPARK_PORT_MAX_RETRIES`, and `SPARK_LOCAL_IP` can be set via environment variables.
+
 
 Example usage:
 
@@ -160,7 +165,15 @@ npm run dev
 
 ### 1\. Docker Setup
 
-The project uses `docker-compose.yml` to orchestrate **Zookeeper**, **Kafka**, and **Kafka UI**. The `setup_environment.sh` and `start_pipeline.sh` scripts handle this automatically, so you don't need to run Docker commands manually.
+The project uses `docker-compose.yml` to orchestrate Zookeeper, Kafka, and Kafka UI.  
+
+All automation scripts are located in the `/scripts` folder:  
+
+- **`setup_environment.sh`** – sets up the environment automatically.  
+- **`start_pipeline.sh`** – starts the pipeline.  
+
+With these scripts, you don't need to run Docker commands manually.
+
 
 ### 2\. `setup_environment.sh`
 
