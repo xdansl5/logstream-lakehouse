@@ -166,15 +166,6 @@ Ensure Kafka is running and the `web-logs` topic exists:
 kafka-topics.sh --create --topic web-logs --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 ```
 
-### 2. Setup Spark
-Start Spark with Delta Lake support:
-```bash
-spark-submit --packages io.delta:delta-core_2.12:2.4.0 \
-  --conf "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" \
-  --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" \
-  your-spark-job.py
-```
-
 ### 3. Test log generation
 To test the platform, you can generate test logs to be processed by the pipeline:
 
