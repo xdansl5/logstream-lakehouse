@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Fix for Python 3.12: ensure pip, setuptools, and wheel are up to date
+python3 -m ensurepip --upgrade
+python3 -m pip install --upgrade pip setuptools wheel
+
 # Setup Environment for Lakehouse Platform
 echo "Setting up Lakehouse Analytics Environment"
 

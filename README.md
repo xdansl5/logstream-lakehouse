@@ -236,7 +236,7 @@ In `scripts/`:
 
 ```bash
 # 1) Generate logs
-python3 enhanced_log_generator.py --rate 10
+python3 log_generator.py --rate 10
 
 # 2) Start rule-based streaming
 python3 streaming_processor.py --mode stream --output-path /tmp/delta-lake/logs --checkpoint-path /tmp/checkpoints/logs
@@ -262,6 +262,15 @@ python3 anomaly_detector.py --mode analyze --output-path /tmp/delta-lake/anomali
 
 # Optional: delta optimization
 python3 streaming_processor.py --mode optimize --output-path /tmp/delta-lake/logs
+```
+
+### Python 3.12 Requirements
+
+If you are using Python 3.12, make sure `pip`, `setuptools`, and `wheel` are up to date:
+
+```bash
+python3 -m ensurepip --upgrade
+python3 -m pip install --upgrade pip setuptools wheel
 ```
 
 ### D. Spark configuration and ports

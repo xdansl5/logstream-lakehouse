@@ -126,7 +126,7 @@ class PipelineOrchestrator:
             # Generate training data first
             logger.info("Generating training dataset...")
             subprocess.run([
-                "python3", os.path.join(self.script_dir, "enhanced_log_generator.py"),
+                "python3", os.path.join(self.script_dir, "log_generator.py"),
                 "--training-data", str(self.config["ml"]["training_samples"]),
                 "--output-file", "training_logs.json"
             ], check=True)
@@ -196,7 +196,7 @@ class PipelineOrchestrator:
         logger.info("Starting log generation...")
         
         self.processes["log_generator"] = subprocess.Popen([
-            "python3", os.path.join(self.script_dir, "enhanced_log_generator.py"),
+            "python3", os.path.join(self.script_dir, "log_generator.py"),
             "--kafka-servers", self.config["kafka"]["servers"],
             "--topic", self.config["kafka"]["topic"],
             "--rate", "20"
