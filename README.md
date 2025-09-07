@@ -201,6 +201,7 @@ Run the script from the terminal:
 bash start_pipeline.sh
 ```
 
+
 ### A. Quick Start (recommended)
 
 From the `scripts` directory:
