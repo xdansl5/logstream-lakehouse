@@ -272,11 +272,11 @@ If you are using **Python 3.12**, some libraries may not work correctly. In that
 ```bash
 python3 -m ensurepip --upgrade
 python3 -m pip install --upgrade pip setuptools wheel
+```
 Recommendation: The safest approach is to create a virtual environment with Python 3.11 (see below) and install dependencies there, avoiding conflicts with the system Python.
 
 Creating a virtual environment with Python 3.11
-bash
-Copia codice
+```bash
 # Create the virtual environment
 python3.11 -m venv venv
 
@@ -287,6 +287,7 @@ venv\Scripts\activate      # Windows
 # Install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
+```
 This ensures the full pipeline (log generator, streaming, ML, anomaly detection) runs correctly without compatibility issues.
 
 ### D. Spark configuration and ports
