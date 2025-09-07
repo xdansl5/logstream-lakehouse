@@ -42,6 +42,36 @@ An interactive platform to ingest, process, and analyze real-time web logs using
                   v
        Web Platform (React App)
 ```
+## Singleton Spark Session
+
+To ensure stable Spark execution, the platform uses a singleton pattern for managing Spark sessions.
+This avoids creating multiple SparkContext instances within the same JVM, which would otherwise trigger the common Spark error “Only one SparkContext may be running in this JVM (SPARK-2243)”.
+
+The shared session logic is implemented in spark_session_manager.py
+.
+
+All components of the pipeline (streaming processor, ML processor, anomaly detector, and analytics jobs) import the get_spark() function to obtain the same SparkSession instance.
+
+This ensures efficient resource use, stable execution, and consistent Delta Lake + Kafka configuration across jobs.
+
+Spark configuration options such as SPARK_UI_ENABLED, SPARK_UI_PORT, SPARK_PORT_MAX_RETRIES, and SPARK_LOCAL_IP can be set via environment variables for flexible runtime behavior.
+
+Example usage:
+
+from spark_session_manager import get_spark, stop_spark
+
+# Get or create the shared SparkSession
+spark = get_spark("LogStreamApp")
+
+# Use Spark normally
+df = spark.read.format("delta").load("/tmp/delta-lake/logs")
+df.show()
+
+# Stop the session explicitly when done
+stop_spark()
+
+
+This design guarantees that all Spark-based components in the platform run on a single, consistent session, making the pipeline more robust and easier to manage.
 
 ## Technologies
 
@@ -72,6 +102,7 @@ An interactive platform to ingest, process, and analyze real-time web logs using
 - Apache Kafka (running on localhost:9092)
 - Apache Spark (running on localhost:7077)
 - Delta Lake tables configured
+- Docker & Docker Compose (to start Kafka and related services)
 
 ### 1. Clone the repository
 ```bash
