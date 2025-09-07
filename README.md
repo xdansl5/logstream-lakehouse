@@ -165,41 +165,6 @@ Ensure Kafka is running and the `web-logs` topic exists:
 # Create the topic if it does not exist
 kafka-topics.sh --create --topic web-logs --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 ```
-
-### 3. Test log generation
-To test the platform, you can generate test logs to be processed by the pipeline:
-
-```python
-# Example Python script to generate logs
-import json
-import time
-import random
-from kafka import KafkaProducer
-
-producer = KafkaProducer(
-    bootstrap_servers=['localhost:9092'],
-    value_serializer=lambda x: json.dumps(x).encode('utf-8')
-)
-
-endpoints = ['/api/users', '/api/orders', '/api/products', '/health', '/metrics']
-methods = ['GET', 'POST', 'PUT', 'DELETE']
-
-while True:
-    log_entry = {
-        'timestamp': time.time() * 1000,
-        'method': random.choice(methods),
-        'endpoint': random.choice(endpoints),
-        'status_code': random.choice([200, 200, 200, 404, 500]),
-        'response_time': random.randint(50, 2000),
-        'ip': f'192.168.{random.randint(1,10)}.{random.randint(1,255)}',
-        'user_id': f'user_{random.randint(1,1000)}',
-        'session_id': f'sess_{random.randint(1000,9999)}'
-    }
-    
-    producer.send('web-logs', log_entry)
-    time.sleep(random.uniform(0.1, 2.0))
-```
-
 ## Pipeline usage
 
 ### A. Quick start (recommended)
