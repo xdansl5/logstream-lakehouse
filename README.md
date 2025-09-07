@@ -28,22 +28,22 @@ An interactive platform to ingest, process, and analyze real-time web logs using
 ## Architecture
 
 ```
-        Web Logs (Sources)
-        |
-        v
+      Web Logs (Sources)
+              |
+              v
         Kafka (Broker)
-        |
-        v
-        Spark Streaming (Processing)
-        |
-        v
-        Delta Lake (Storage)
-        |
-        v
-        API Server (Express)
-        |
-        v
-        Web Platform (React App)
+              |
+              v
+  Spark Streaming (Processing)
+              |
+              v
+      Delta Lake (Storage)
+              |
+              v
+      API Server (Express)
+              |
+              v
+      Web Platform (React App)
 ```
 
 ## Singleton Spark Session
