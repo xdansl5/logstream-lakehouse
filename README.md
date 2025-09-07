@@ -43,7 +43,7 @@ An interactive platform to ingest, process, and analyze real-time web logs using
       API Server (Express)
               |
               v
-      Web Platform (React App)
+    Web Platform (React App)
 ```
 
 ## Singleton Spark Session
