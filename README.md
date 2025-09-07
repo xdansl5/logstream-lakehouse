@@ -159,7 +159,7 @@ npm run dev
 
 ## Pipeline configuration
 
-### 1. Setup Kafka
+### Setup Kafka
 Ensure Kafka is running and the `web-logs` topic exists:
 ```bash
 # Create the topic if it does not exist
