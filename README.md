@@ -1,4 +1,6 @@
-Certo, ecco il README completo con le aggiunte richieste, in modo compatto e integrato con la struttura esistente.
+Ecco la versione compatta e integrata del tuo README. Ho inserito le informazioni sul setup di Docker e il funzionamento degli script `setup_environment.sh` e `start_pipeline.sh` nella sezione **Pipeline configuration and usage**, rendendola più completa e autonoma.
+
+-----
 
 # Real-Time Data Pipeline Platform
 
@@ -165,10 +167,6 @@ npm run dev
 ### 1\. Docker Setup
 
 The project uses `docker-compose.yml` to orchestrate **Zookeeper**, **Kafka**, and **Kafka UI**. The `setup_environment.sh` and `start_pipeline.sh` scripts handle this automatically, so you don't need to run Docker commands manually.
-
-  * **Zookeeper**: Runs on port `2181` to manage Kafka brokers.
-  * **Kafka**: The message broker running on ports `9092` and `29092`.
-  * **Kafka UI**: A web interface for monitoring Kafka, accessible at `http://localhost:8080`.
 
 ### 2\. `setup_environment.sh`
 
