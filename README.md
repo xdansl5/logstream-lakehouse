@@ -119,73 +119,86 @@ npm install
 
 ## 🚀 Running the Platform
 
-We recommend using the provided orchestration script for a seamless start.
+For a smooth start, we recommend using Docker containers and the orchestration script.
 
-### Quick Start (Recommended)
+### Running with Docker (Recommended)
 
-This method automatically sets up all the required services, including Kafka and the data generator.
+Using Docker Compose is the easiest way to start the entire pipeline infrastructure (Kafka, Zookeeper, and Kafka UI).
 
-1.  Navigate to the `scripts` directory.
-2.  Install Python dependencies:
+1.  Make sure you have Docker and Docker Compose installed and running.
+
+2.  From your terminal, in the root directory of the project, start the services:
+
+    ```bash
+    docker-compose up -d
+    ```
+
+    This command will run the containers in the background. It may take a few minutes.
+
+3.  Verify that the containers are running:
+
+    ```bash
+    docker-compose ps
+    ```
+
+Once the containers are active, the infrastructure is ready:
+
+  * **Kafka UI**: `http://localhost:8080`
+  * **Kafka**: `localhost:9092`
+
+### Running the Pipeline and Web App
+
+After starting the infrastructure with Docker, you can run the rest of the pipeline and the user interface.
+
+1.  In the `scripts/` directory, install the Python dependencies:
+
     ```bash
     pip install -r requirements.txt
     ```
-3.  Run the orchestration script:
+
+2.  Run the orchestration script to start the Spark processors and the log generator:
+
     ```bash
     python3 pipeline_orchestrator.py --action start
     ```
 
-This command will:
+    **Note:** Since Kafka is already running in a container, the script will only start the Spark components and the log generator.
 
-  * Start Kafka and a test log generator.
-  * Set up the necessary directories.
-  * Launch all Spark-based processors.
+3.  In another terminal, in the root directory of the project, start the backend and frontend:
 
-To stop the entire pipeline, run:
+    ```bash
+    # Start the backend server
+    npm run server
 
-```bash
-python3 pipeline_orchestrator.py --action stop
-```
+    # Start the frontend app
+    npm run dev
+    ```
 
-### Manual Setup
+    The frontend application will be available at `http://localhost:5173`.
 
-If you prefer to run each component individually, you can use the following commands from the `scripts/` directory.
+### Stopping the Services
 
-#### Start Data Generation
+To stop the entire platform cleanly:
 
-```bash
-python3 enhanced_log_generator.py --rate 10
-```
+1.  **Stop the Spark processors and log generator**:
 
-#### Start Spark Processors
+    ```bash
+    python3 scripts/pipeline_orchestrator.py --action stop
+    ```
 
-```bash
-# Start the main streaming processor
-python3 streaming_processor.py --mode stream
+2.  **Stop the Docker containers**:
 
-# Start the ML anomaly detector
-python3 anomaly_detector.py --mode detect
-```
+    ```bash
+    docker-compose down
+    ```
 
-#### Start Frontend & Backend
-
-In the root directory of the project:
-
-```bash
-# Start the backend server
-npm run server
-
-# Start the frontend app
-npm run dev
-```
-
-The frontend will be available at `http://localhost:5173`.
+3.  **Stop the Node.js processes**: Manually interrupt the terminals where `npm run server` and `npm run dev` are running (e.g., with `Ctrl + C`).
 
 -----
 
 ## 📊 Analytics & Maintenance
 
-The pipeline provides various modes for running analytics jobs and performing maintenance.
+The pipeline provides various modes for running analytics and maintenance jobs.
 
 ### Batch Analytics
 
@@ -194,7 +207,7 @@ The pipeline provides various modes for running analytics jobs and performing ma
 
 ### Delta Lake Optimization
 
-To optimize the stored data for faster queries:
+To optimize the stored data and improve query performance:
 
 ```bash
 python3 streaming_processor.py --mode optimize
@@ -206,14 +219,15 @@ python3 streaming_processor.py --mode optimize
 
 ### Connectivity Issues
 
-  * **Kafka**: Ensure it's running on `localhost:9092`. You can use `docker-compose up` in the `scripts/` directory.
-  * **Spark**: Check if the Spark master is available on `localhost:7077`.
-  * **Delta Lake**: Verify the output path (`/tmp/delta-lake` by default) has the correct read/write permissions.
+  * **Kafka**: Ensure the `kafka` container is running and its ports are mapped correctly.
+  * **Spark**: If Spark is running in a container, verify that your Python script can connect to its master.
+  * **Paths**: If you're using containers for Spark, make sure the paths (e.g., `/tmp/delta-lake`) are mapped as volumes between the host and the container.
 
 ### Debugging
 
+  * **Container logs**: Use `docker-compose logs <service_name>` to inspect the logs of a specific service (e.g., `kafka`).
   * **Backend logs**: Check the console output of `npm run server`.
-  * **API checks**: Use `curl` to verify the backend is running and responding:
+  * **API checks**: Use `curl` to verify that the backend is active and responding:
     ```bash
     curl http://localhost:4000/api/metrics
     ```
@@ -226,7 +240,7 @@ Contributions are welcome\! Please follow these steps:
 
 1.  Fork the repository.
 2.  Create a new branch (`git checkout -b feature/your-feature-name`).
-3.  Make your changes and commit them (`git commit -m 'Add your feature'`).
+3.  Make your changes and commit them (`git commit -m 'Add your awesome feature'`).
 4.  Push to the branch (`git push origin feature/your-feature-name`).
 5.  Open a Pull Request with a clear description of your changes.
 
