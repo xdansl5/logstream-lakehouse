@@ -275,7 +275,7 @@ python3 -m pip install --upgrade pip setuptools wheel
 ```
 Recommendation: The safest approach is to create a virtual environment with Python 3.11 (see below) and install dependencies there, avoiding conflicts with the system Python.
 
-Creating a virtual environment with Python 3.11
+#### Creating a virtual environment with Python 3.11
 ```bash
 # Create the virtual environment
 python3.11 -m venv venv
