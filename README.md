@@ -58,7 +58,10 @@ Spark configuration options such as SPARK_UI_ENABLED, SPARK_UI_PORT, SPARK_PORT_
 
 Example usage:
 
+```bash
 from spark_session_manager import get_spark, stop_spark
+```
+
 
 # Get or create the shared SparkSession
 ```bash
