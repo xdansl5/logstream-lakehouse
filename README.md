@@ -210,7 +210,6 @@ bash start_pipeline.sh
 From the `scripts` directory:
 
 ```bash
-pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
 ./setup_environment.sh
 python3 pipeline_orchestrator.py --action start
@@ -264,14 +263,31 @@ python3 anomaly_detector.py --mode analyze --output-path /tmp/delta-lake/anomali
 python3 streaming_processor.py --mode optimize --output-path /tmp/delta-lake/logs
 ```
 
-### Python 3.12 Requirements
+### Python 3.11 Requirements
 
-If you are using Python 3.12, make sure `pip`, `setuptools`, and `wheel` are up to date:
+This project **requires Python 3.11** to ensure compatibility with all libraries, especially `kafka-python`.
+
+If you are using **Python 3.12**, some libraries may not work correctly. In that case, make sure to update `pip`, `setuptools`, and `wheel`:
 
 ```bash
 python3 -m ensurepip --upgrade
 python3 -m pip install --upgrade pip setuptools wheel
-```
+Recommendation: The safest approach is to create a virtual environment with Python 3.11 (see below) and install dependencies there, avoiding conflicts with the system Python.
+
+Creating a virtual environment with Python 3.11
+bash
+Copia codice
+# Create the virtual environment
+python3.11 -m venv venv
+
+# Activate it
+source venv/bin/activate   # Linux/macOS
+venv\Scripts\activate      # Windows
+
+# Install dependencies
+pip install --upgrade pip
+pip install -r requirements.txt
+This ensures the full pipeline (log generator, streaming, ML, anomaly detection) runs correctly without compatibility issues.
 
 ### D. Spark configuration and ports
 
