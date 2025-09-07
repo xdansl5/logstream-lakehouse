@@ -61,14 +61,20 @@ Example usage:
 from spark_session_manager import get_spark, stop_spark
 
 # Get or create the shared SparkSession
+```bash
 spark = get_spark("LogStreamApp")
+```
 
 # Use Spark normally
+```bash
 df = spark.read.format("delta").load("/tmp/delta-lake/logs")
 df.show()
+```
 
 # Stop the session explicitly when done
+```bash
 stop_spark()
+```
 
 
 This design guarantees that all Spark-based components in the platform run on a single, consistent session, making the pipeline more robust and easier to manage.
